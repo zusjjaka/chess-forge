@@ -18,6 +18,10 @@ ChessForge - это веб-приложение для создания, изу�
 
 Основная документация проекта находится в [`docs/`](docs/).
 
+- [High level design](docs/high-level-design.md)
+- [Low level design](docs/low-level-design.md)
+- [API specification](docs/api.md)
+
 ### Requirements
 
 - [Requirements](docs/requirements.md) - функциональные требования проекта, разделённые на Must-have, Intermediate и Future Features.
