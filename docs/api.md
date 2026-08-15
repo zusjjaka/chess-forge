@@ -4,8 +4,17 @@
 
 Публичное АПИ поделено на два протокола:
 
-- REST API: `/api/v1/...`
-- WebSocket API: `/ws/v1/...`
+<style>
+  a {
+    color: #94d3e7;
+  }
+  a:hover {
+    color: #609cae;
+  }
+</style>
+
+- REST API: <a href="#api">/api/v1/...</a>
+- WebSocket API: <a href="#websocket-api">/ws/v1/...</a>
 
 Аутентификация использует JWT. Защищенные http endpoints требуют валидного access токена.
 
@@ -13,39 +22,39 @@
 
 ## Scheme
 
-```text
+<pre>
 /api/v1/
 ├── auth/
-│   ├── register
-│   ├── login
-│   ├── logout
+│   ├── <a href="#post-apiv1authregister">register</a>
+│   ├── <a href="#post-apiv1authlogin">login</a>
+│   ├── <a href="#post-apiv1authlogout">logout</a>
 │   ├── tokens/
-│   │   ├── approval
-│   │   └── refresh
+│   │   ├── <a href="#post-apiv1authtokensapproval">approval</a>
+│   │   └── <a href="#post-apiv1authtokensrefresh">refresh</a>
 │   ├── password/
-│   │   ├── reset/request
-│   │   ├── reset/confirm
-│   │   └── change
+│   │   ├── <a href="#post-apiv1authpasswordresetrequest">reset/request</a>
+│   │   ├── <a href="#post-apiv1authpasswordresetconfirm">reset/confirm</a>
+│   │   └── <a href="#post-apiv1authpasswordchange">change</a>
 │   ├── email/
-│   │   ├── change
-│   │   └── change/confirm
-│   └── me
+│   │   ├── <a href="#post-apiv1authemailchange">change</a>
+│   │   └── <a href="#post-apiv1authemailchangeconfirm">change/confirm</a>
+│   └── <a href="#get-apiv1authme">me</a>
 │
-├── repertoires/
-│   ├──
-│   └── {repertoire_id}
-│       └── lines
-│           └── {line_id}
+├── <a href="#get-apiv1repertoires">repertoires/</a>
+│   └── <a href="#get-apiv1repertoiresrepertoire_id">{repertoire_id}</a>
+│       └── <a href="#get-apiv1repertoiresrepertoire_idlines">lines/</a>
+│           └── <a href="#patch-apiv1repertoiresrepertoire_idlinesline_id">{line_id}</a>
 │
 └── training/
-    ├── sessions
-    │   └── {session_id}
-    └── sessions/{session_id}/moves
+    ├── <a href="#get-apiv1trainingsessions">sessions/</a>
+    │   └── <a href="#get-apiv1trainingsessionssession_id">{session_id}</a>
+    └── <a href="#post-apiv1trainingsessionssession_idmoves">sessions/{session_id}/moves</a>
+
 
 /ws/v1/
 └── engine/
-    └── analysis
-```
+    └── <a href="#ws-ws-v1engineanalysis">analysis</a>
+</pre>
 
 ---
 
