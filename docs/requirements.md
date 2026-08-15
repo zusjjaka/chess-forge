@@ -1,4 +1,4 @@
-[Вернутся к README.md](../README.md)
+[← README](../README.md)
 
 # Requirements
 

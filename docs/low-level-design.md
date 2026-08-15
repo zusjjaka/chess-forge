@@ -1,4 +1,4 @@
-[Вернуться к README.md](../README.md)
+[← README](../README.md)
 
 # Low-Level Design
 

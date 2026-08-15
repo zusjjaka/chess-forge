@@ -1,4 +1,4 @@
-[Вернуться к README.md](../../README.md)
+[← README](../../README.md)
 
 # ADR-0002: FastAPI
 
