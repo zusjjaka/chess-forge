@@ -21,6 +21,7 @@ ChessForge - это веб-приложение для создания, изу�
 - [High level design](docs/high-level-design.md)
 - [Low level design](docs/low-level-design.md)
 - [API specification](docs/api.md)
+- [Cyber Security](docs/security.md)
 
 ### Requirements
 
