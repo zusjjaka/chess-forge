@@ -25,6 +25,7 @@ ChessForge - это веб-приложение для создания, изу�
 - [Exceptions/Response-Codes](docs/exceptions.md)
 - [Databases](docs/database.md)
 - [Authentication](docs/auth.md)
+- [Infrastructure](docs/infrastructure.md)
 
 ### Requirements
 
