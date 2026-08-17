@@ -20,11 +20,14 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 
 [tool.ruff]
+include = [
+    "*.py",
+]
 preview = true
 line-length = 88
 indent-width = 4
 target-version = "py313"
-fix = true
+fix = false
 
 [tool.ruff.lint]
 select = [
@@ -47,7 +50,6 @@ select = [
     "PIE",
     "ERA",
     "ARG",
-    "Q",
     "T10",
     "T20",
     "FIX",
@@ -58,6 +60,9 @@ ignore = [
     "unnecessary-assign",
     "bad-quotes-multiline-string",
 ]
+
+[tool.ruff.format]
+quote-style = "single"
 
 [tool.ruff.lint.flake8-quotes]
 inline-quotes = "single"
