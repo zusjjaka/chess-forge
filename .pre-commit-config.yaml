@@ -15,7 +15,7 @@ repos:
 
       - id: ruff-check
         name: Ruff check
-        entry: uv run ruff check
+        entry: uv run --directory backend/auth ruff check
         language: system
         types: [python]
 
