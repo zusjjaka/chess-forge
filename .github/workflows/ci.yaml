@@ -18,13 +18,13 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d auth_test"
+          --health-cmd "pg_isready -U auth_test -d auth_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/auth_test
+      DATABASE_URL: postgresql+asyncpg://auth_test:root@localhost:5432/auth_test
 
     steps:
       - name: Checkout
