@@ -143,14 +143,6 @@ async def logout(
     )
 
 
-@router.get(
-    '/me',
-    response_model=UserResponse,
-)
-async def me(current_user: User = Depends(get_current_user)) -> UserResponse:
-    return UserResponse.model_validate(current_user)
-
-
 @router.post(
     '/logout-all',
     status_code=status.HTTP_204_NO_CONTENT,
@@ -162,3 +154,11 @@ async def logout_all(
     service = AuthService(session)
 
     await service.logout_all(current_user.id)
+
+
+@router.get(
+    '/me',
+    response_model=UserResponse,
+)
+async def me(current_user: User = Depends(get_current_user)) -> UserResponse:
+    return UserResponse.model_validate(current_user)

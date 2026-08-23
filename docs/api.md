@@ -28,6 +28,7 @@
 │   ├── <a href="#post-apiv1authregister">register</a>
 │   ├── <a href="#post-apiv1authlogin">login</a>
 │   ├── <a href="#post-apiv1authlogout">logout</a>
+│   ├── <a href="#post-apiv1authlogout-all">logout-all</a>
 │   ├── tokens/
 │   │   ├── <a href="#post-apiv1authtokensapproval">approval</a>
 │   │   └── <a href="#post-apiv1authtokensrefresh">refresh</a>
@@ -117,13 +118,31 @@
 
 ### `POST /api/v1/auth/logout`
 
-Делает все refresh токены пользователя неактивными.
+Завершает текущую сессию пользователя.
+
+Текущий refresh token становится неактивным и больше не может использоваться для получения новой пары токенов.
+
 Текущий access token остаётся действительным до истечения срока действия.
-В обычных условиях access токен теряется при перенаправлении на домашнюю страницу сайта.
 
 **Input**
 
-Access токен передается через заголовок Authorization: 'Bearer \<access-token\>'
+Refresh token передается серверу через HttpOnly, Secure, SameSite: Strict cookie.
+
+**Output — `204 No Content`**
+
+---
+
+### `POST /api/v1/auth/logout-all`
+
+Завершает все активные сессии пользователя.
+
+Все refresh токены пользователя становятся неактивными и больше не могут использоваться для получения новых access токенов.
+
+Текущий access token и другие уже выданные access токены остаются действительными до истечения срока действия.
+
+**Input**
+
+Refresh token передается серверу через HttpOnly, Secure, SameSite: Strict cookie.
 
 **Output — `204 No Content`**
 
@@ -915,3 +934,23 @@ HTTP-Метод не существует для данного endpoint.
 ### `500 Internal Server Error`
 
 Неожиданная ошибка на стороне сервера.
+
+---
+
+# Custom Exceptions
+
+## `UserAlreadyExistError`
+
+Возникает при попытке зарегистрировать пользователя с email, который уже зарегистрирован в системе.
+
+Используется для обработки конфликта уникальности пользователя.
+
+**HTTP Response — `409 Conflict`**
+
+---
+
+## `InvalidAccessTokenError`
+
+Возникает, когда переданный access token отсутствует, имеет некорректную структуру, не прошел проверку подписи, истёк или содержит недопустимые данные.
+
+**HTTP Response — `401 Unauthorized`**
