@@ -46,7 +46,6 @@ jobs:
         run: uv run mypy .
 
       - name: Generate JWT keys
-        working-directory: backend/auth
         run: uv run python scripts/generate_keys.py
 
       - name: Pytest
