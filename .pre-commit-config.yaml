@@ -19,8 +19,8 @@ repos:
         language: system
         types: [python]
 
-      - id: auth-mypy
-        name: auth mypy
-        entry: bash -c 'cd backend/auth && uv run mypy .'
+      - id: mypy
+        name: Mypy
+        entry: uv run mypy .
         language: system
         pass_filenames: false

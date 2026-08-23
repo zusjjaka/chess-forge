@@ -1,0 +1,62 @@
+include = [
+    "*.py",
+]
+exclude = [
+    "**/alembic/versions/**/*.py",
+]
+preview = true
+line-length = 88
+indent-width = 4
+target-version = "py313"
+fix = false
+
+[lint]
+select = [
+    "E4",
+    "E7",
+    "E9",
+    "line-too-long",
+    "trailing-whitespace",
+    "too-many-newlines-at-end-of-file",
+    "missing-newline-at-end-of-file",
+    "blank-line-with-whitespace",
+    "F",
+    "I",
+    "B",
+    "UP",
+    "SIM",
+    "A",
+    "RET",
+    "RSE",
+    "PIE",
+    "ARG",
+    "T10",
+    "T20",
+    "FIX",
+    "RUF",
+]
+dummy-variable-rgx = "^(_.*|args|kwargs)$"
+
+ignore = [
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    "B008",
+    "unnecessary-assign",
+    "bad-quotes-multiline-string",
+]
+
+[format]
+quote-style = "single"
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+multiline-quotes = "single"
+docstring-quotes = "double"
+avoid-escape = true
+
+[lint.pydocstyle]
+convention = "pep257"
+
+[lint.isort]
+known-first-party = ["."]

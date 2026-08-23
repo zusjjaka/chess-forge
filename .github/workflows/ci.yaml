@@ -41,18 +41,22 @@ jobs:
         run: uv sync --locked
 
       - name: Ruff
-        working-directory: backend/auth
         run: |
-          uv run ruff check
-          uv run ruff format --check
+          uv run --directory backend/auth ruff check
+          uv run --directory backend/auth ruff format --check
 
       - name: Mypy
-        working-directory: backend/auth
-        run: uv run mypy .
+        run: uv run --directory backend/auth mypy .
 
       - name: Generate JWT keys
         working-directory: backend/auth
         run: uv run python ../../scripts/generate_keys.py
+
+      - name: Run migrations
+        working-directory: backend/auth
+        env:
+          DATABASE_URL: postgresql+psycopg://auth_test:root@localhost:5432/auth_test
+        run: uv run alembic upgrade head
 
       - name: Pytest
         working-directory: backend/auth
