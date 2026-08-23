@@ -8,6 +8,25 @@ jobs:
   quality:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: auth_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d auth_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: backend/auth
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,9 +45,8 @@ jobs:
           uv run ruff check
           uv run ruff format --check
 
-      # - name: Mypy
-      #   run: uv run mypy src
+      - name: Mypy
+        run: uv run mypy .
 
-      # - name: Pytest
-      #   run: uv run pytest
-  
+      - name: Pytest
+        run: uv run pytest

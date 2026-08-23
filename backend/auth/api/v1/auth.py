@@ -129,7 +129,5 @@ async def refresh(
     '/me',
     response_model=UserResponse,
 )
-async def me(
-    current_user: User = Depends(get_current_user),
-) -> UserResponse:
+async def me(current_user: User = Depends(get_current_user)) -> UserResponse:
     return UserResponse.model_validate(current_user)
