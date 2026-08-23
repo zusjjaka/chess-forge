@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import (
 
 from db.base import Base
 
-DATABASE_URL = 'postgresql+asyncpg://auth_test:root@localhost:5433/auth_test'
+DATABASE_URL = 'postgresql+asyncpg://auth_test:root@localhost:5432/auth_test'
 
 
 @pytest_asyncio.fixture
