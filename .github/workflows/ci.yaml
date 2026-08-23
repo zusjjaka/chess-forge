@@ -32,15 +32,19 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync
+        working-directory: backend/auth
+        run: uv sync --locked
 
       - name: Ruff
+        working-directory: backend/auth
         run: |
           uv run ruff check
           uv run ruff format --check
 
       - name: Mypy
+        working-directory: backend/auth
         run: uv run mypy .
 
       - name: Pytest
+        working-directory: backend/auth
         run: uv run pytest
