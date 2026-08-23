@@ -37,15 +37,18 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
+        working-directory: backend/auth
         run: uv sync --locked
 
       - name: Ruff
+        working-directory: backend/auth
         run: |
           uv run ruff check
           uv run ruff format --check
 
-      - name: Mypy auth
-        run: uv run --directory backend/auth mypy .
+      - name: Mypy
+        working-directory: backend/auth
+        run: uv run mypy .
 
       - name: Generate JWT keys
         working-directory: backend/auth
