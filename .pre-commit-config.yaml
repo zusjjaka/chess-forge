@@ -21,6 +21,6 @@ repos:
 
       - id: mypy
         name: Mypy
-        entry: uv run mypy .
+        entry: uv run --directory backend/auth mypy .
         language: system
         pass_filenames: false

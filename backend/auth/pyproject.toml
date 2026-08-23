@@ -1,5 +1,5 @@
 [project]
-name = "chess-forge"
+name = "auth-service"
 version = "0.1.0"
 requires-python = ">=3.13,<3.14"
 dependencies = [
@@ -14,15 +14,6 @@ dependencies = [
     "pyjwt>=2.13.0",
     "sqlalchemy>=2.0.52",
     "psycopg[binary]>=3.3.4",
-]
-
-[dependency-groups]
-dev = [
-    "mypy",
-    "pre-commit",
-    "pytest",
-    "pytest-asyncio>=1.4.0",
-    "ruff",
 ]
 
 [tool.pytest.ini_options]
