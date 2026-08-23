@@ -107,9 +107,4 @@ warn_unused_configs = true
 
 disallow_untyped_decorators = false
 
-[[tool.mypy.overrides]]
-module = ["tests.*"]
-
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-disallow_any_generics = false
+exclude = "^tests/"
