@@ -8,18 +8,23 @@ jobs:
   quality:
     runs-on: ubuntu-latest
 
-    env:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/auth_test
-
     services:
       postgres:
         image: postgres:18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: auth
+          POSTGRES_DB: auth_test
         ports:
           - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d auth_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/auth_test
 
     steps:
       - name: Checkout
@@ -51,6 +56,4 @@ jobs:
 
       - name: Pytest
         working-directory: backend/auth
-        env:
-          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
         run: uv run pytest
