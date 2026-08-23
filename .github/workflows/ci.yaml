@@ -8,24 +8,18 @@ jobs:
   quality:
     runs-on: ubuntu-latest
 
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/auth_test
+
     services:
       postgres:
         image: postgres:18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: auth_test
+          POSTGRES_DB: auth
         ports:
           - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d auth_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    defaults:
-      run:
-        working-directory: backend/auth
 
     steps:
       - name: Checkout
@@ -38,7 +32,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --locked
 
       - name: Ruff
         run: |
