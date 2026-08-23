@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 
+from db.base import Base
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -13,8 +14,6 @@ from sqlalchemy.orm import (
     Mapped,
     mapped_column,
 )
-
-from db.base import Base
 
 
 class RefreshToken(Base):

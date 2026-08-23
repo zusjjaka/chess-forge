@@ -1,13 +1,12 @@
 import uuid
 from datetime import UTC, datetime
 
+from models.refresh_token import RefreshToken
 from sqlalchemy import (
     select,
     update,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.refresh_token import RefreshToken
 
 
 class RefreshTokenRepository:

@@ -9,7 +9,6 @@ from datetime import (
 from typing import Any
 
 import jwt
-
 from core.config import get_settings
 from core.jwt import (
     PRIVATE_KEY,

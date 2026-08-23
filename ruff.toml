@@ -2,8 +2,12 @@ include = [
     "*.py",
 ]
 exclude = [
-    "**/alembic/versions/**/*.py",
+    "tests",
+    "alembic/versions",
 ]
+
+force-exclude = true
+
 preview = true
 line-length = 88
 indent-width = 4
@@ -60,3 +64,6 @@ convention = "pep257"
 
 [lint.isort]
 known-first-party = ["."]
+
+[lint.per-file-ignores]
+"scripts/**" = ["T201"]
