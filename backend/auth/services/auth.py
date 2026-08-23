@@ -12,6 +12,7 @@ from fastapi import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import get_settings
+from exceptions import UserAlreadyExistError
 from models.user import User
 from repositories.refresh_tokens import RefreshTokenRepository
 from repositories.users import UserRepository
@@ -41,11 +42,8 @@ class AuthService:
     ) -> User:
         existing_user = await self.users.get_by_email(email)
 
-        if existing_user is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail='User already exists',
-            )
+        if existing_user:
+            raise UserAlreadyExistError(email)
 
         user = await self.users.create(
             email=email,

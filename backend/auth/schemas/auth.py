@@ -1,11 +1,13 @@
 import uuid
 from datetime import datetime
+from typing import Self
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     EmailStr,
     Field,
+    model_validator,
 )
 
 
@@ -13,6 +15,13 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     password_repeat: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode='after')
+    def password_match(self) -> Self:
+        if self.password != self.password_repeat:
+            raise ValueError('Passwords do not match')
+
+        return self
 
 
 class RegisterResponse(BaseModel):

@@ -31,12 +31,8 @@ settings = get_settings()
     status_code=status.HTTP_201_CREATED,
 )
 async def register(
-    data: RegisterRequest,
-    session: AsyncSession = Depends(get_db_session),
+    data: RegisterRequest, session: AsyncSession = Depends(get_db_session)
 ) -> RegisterResponse:
-    if data.password != data.password_repeat:
-        raise ValueError('Passwords do not match')
-
     service = AuthService(session)
 
     user = await service.register(

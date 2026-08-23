@@ -65,6 +65,9 @@ select = [
 ]
 dummy-variable-rgx = "^(_.*|args|kwargs)$"
 ignore = [
+    "RUF001",
+    "RUF002",
+    "RUF003",
     "B008",
     "unnecessary-assign",
     "bad-quotes-multiline-string",
