@@ -42,11 +42,11 @@ jobs:
 
       - name: Ruff
         run: |
-          uv run --directory backend/auth ruff check
-          uv run --directory backend/auth ruff format --check
+          uv run ruff check
+          uv run ruff format --check
 
       - name: Mypy
-        run: uv run --directory backend/auth mypy .
+        run: uv run mypy .
 
       - name: Generate JWT keys
         working-directory: backend/auth
