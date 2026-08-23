@@ -125,9 +125,40 @@ async def refresh(
     )
 
 
+@router.post('/logout', status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    refresh_token = request.cookies.get(settings.refresh_token_cookie.name)
+
+    if refresh_token is not None:
+        service = AuthService(session)
+        await service.logout(refresh_token)
+
+    response.delete_cookie(
+        key=settings.refresh_token_cookie.name,
+        path=settings.refresh_token_cookie.path,
+    )
+
+
 @router.get(
     '/me',
     response_model=UserResponse,
 )
 async def me(current_user: User = Depends(get_current_user)) -> UserResponse:
     return UserResponse.model_validate(current_user)
+
+
+@router.post(
+    '/logout-all',
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def logout_all(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    service = AuthService(session)
+
+    await service.logout_all(current_user.id)

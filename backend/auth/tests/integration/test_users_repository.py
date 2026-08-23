@@ -1,51 +1,33 @@
 import uuid
 
 import pytest
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from repositories.users import UserRepository
 
 
 @pytest.mark.asyncio
-async def test_create_user(session):
+async def test_create_user(session: AsyncSession) -> None:
     repository = UserRepository(session)
 
     user = await repository.create(
-        email=f'{uuid.uuid4()}@example.com',
-        password_hash='hashed_password',
+        email='user@example.com',
+        password_hash='hashed-password',
     )
-
-    await session.commit()
 
     assert user.id is not None
-    assert user.password_hash == 'hashed_password'
+    assert user.email == 'user@example.com'
+    assert user.password_hash == 'hashed-password'
 
 
 @pytest.mark.asyncio
-async def test_get_user_by_email(session):
-    repository = UserRepository(session)
-
-    email = f'{uuid.uuid4()}@example.com'
-
-    await repository.create(
-        email=email,
-        password_hash='hashed_password',
-    )
-
-    await session.commit()
-
-    user = await repository.get_by_email(email)
-
-    assert user is not None
-    assert user.email == email
-
-
-@pytest.mark.asyncio
-async def test_get_user_by_id(session):
+async def test_get_user_by_id(session: AsyncSession) -> None:
     repository = UserRepository(session)
 
     user = await repository.create(
-        email=f'{uuid.uuid4()}@example.com',
-        password_hash='hashed_password',
+        email='user@example.com',
+        password_hash='hashed-password',
     )
 
     await session.commit()
@@ -54,12 +36,79 @@ async def test_get_user_by_id(session):
 
     assert result is not None
     assert result.id == user.id
+    assert result.email == 'user@example.com'
 
 
 @pytest.mark.asyncio
-async def test_get_nonexistent_user(session):
+async def test_get_user_by_email(session: AsyncSession) -> None:
+    repository = UserRepository(session)
+
+    user = await repository.create(
+        email='user@example.com',
+        password_hash='hashed-password',
+    )
+
+    await session.commit()
+
+    result = await repository.get_by_email('user@example.com')
+
+    assert result is not None
+    assert result.id == user.id
+
+
+@pytest.mark.asyncio
+async def test_get_user_by_id_returns_none_for_unknown_user(
+    session: AsyncSession,
+) -> None:
     repository = UserRepository(session)
 
     result = await repository.get_by_id(uuid.uuid4())
 
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_user_by_email_returns_none_for_unknown_email(
+    session: AsyncSession,
+) -> None:
+    repository = UserRepository(session)
+
+    result = await repository.get_by_email('unknown@example.com')
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_create_user_with_duplicate_email(
+    session: AsyncSession,
+) -> None:
+    repository = UserRepository(session)
+
+    await repository.create(
+        email='user@example.com',
+        password_hash='hashed-password',
+    )
+    await session.commit()
+
+    with pytest.raises(IntegrityError):
+        await repository.create(
+            email='user@example.com',
+            password_hash='another-password',
+        )
+
+    await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_create_user_defaults(session: AsyncSession) -> None:
+    repository = UserRepository(session)
+
+    user = await repository.create(
+        email='user@example.com',
+        password_hash='hashed-password',
+    )
+
+    await session.commit()
+
+    assert user.is_email_verified is False
+    assert user.created_at is not None

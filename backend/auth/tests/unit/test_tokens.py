@@ -1,8 +1,9 @@
 import uuid
+from datetime import UTC, datetime
 
 import jwt
-import pytest
 
+from core.jwt import PUBLIC_KEY
 from utils.tokens import (
     create_access_token,
     decode_access_token,
@@ -11,84 +12,89 @@ from utils.tokens import (
 )
 
 
-def test_create_access_token():
-    user_id = uuid.uuid4()
+class TestAccessToken:
+    def test_create_access_token(self) -> None:
+        user_id = uuid.uuid4()
 
-    token = create_access_token(user_id)
+        token = create_access_token(user_id)
+        payload = jwt.decode(
+            token,
+            PUBLIC_KEY,
+            algorithms=['RS256'],
+        )
 
-    assert isinstance(token, str)
-    assert token
+        assert payload['sub'] == str(user_id)
+        assert 'iat' in payload
+        assert 'exp' in payload
+        assert 'jti' in payload
 
+    def test_access_token_has_expiration(self) -> None:
+        user_id = uuid.uuid4()
 
-def test_decode_access_token():
-    user_id = uuid.uuid4()
+        token = create_access_token(user_id)
+        payload = jwt.decode(
+            token,
+            PUBLIC_KEY,
+            algorithms=['RS256'],
+        )
 
-    token = create_access_token(user_id)
-    payload = decode_access_token(token)
+        now = datetime.now(UTC).timestamp()
 
-    assert payload['sub'] == str(user_id)
-    assert 'iat' in payload
-    assert 'exp' in payload
-    assert 'jti' in payload
+        assert payload['exp'] > now
 
+    def test_decode_access_token(self) -> None:
+        user_id = uuid.uuid4()
 
-def test_access_token_has_unique_jti():
-    user_id = uuid.uuid4()
+        token = create_access_token(user_id)
+        payload = decode_access_token(token)
 
-    first_payload = decode_access_token(create_access_token(user_id))
-    second_payload = decode_access_token(create_access_token(user_id))
+        assert payload['sub'] == str(user_id)
 
-    assert first_payload['jti'] != second_payload['jti']
+    def test_invalid_token_raises_error(self) -> None:
+        invalid_token = 'not.a.valid.jwt'
 
-
-def test_access_token_contains_correct_expiration():
-    user_id = uuid.uuid4()
-
-    token = create_access_token(user_id)
-    payload = decode_access_token(token)
-
-    assert payload['exp'] > payload['iat']
-
-
-def test_decode_invalid_token():
-    with pytest.raises(jwt.InvalidTokenError):
-        decode_access_token('invalid-token')
-
-
-def test_generate_refresh_token():
-    token = generate_refresh_token()
-
-    assert isinstance(token, str)
-    assert token
+        try:
+            decode_access_token(invalid_token)
+        except jwt.InvalidTokenError:
+            pass
+        else:
+            raise AssertionError('Expected jwt.InvalidTokenError')
 
 
-def test_generate_refresh_tokens_are_unique():
-    first = generate_refresh_token()
-    second = generate_refresh_token()
+class TestRefreshToken:
+    def test_generate_refresh_token(self) -> None:
+        token = generate_refresh_token()
 
-    assert first != second
+        assert isinstance(token, str)
+        assert len(token) > 0
 
+    def test_generate_refresh_tokens_are_unique(self) -> None:
+        first_token = generate_refresh_token()
+        second_token = generate_refresh_token()
 
-def test_hash_refresh_token():
-    token = 'refresh-token'
+        assert first_token != second_token
 
-    token_hash = hash_refresh_token(token)
+    def test_hash_refresh_token(self) -> None:
+        token = 'refresh-token'
 
-    assert isinstance(token_hash, bytes)
-    assert len(token_hash) == 32
+        token_hash = hash_refresh_token(token)
 
+        assert isinstance(token_hash, bytes)
+        assert len(token_hash) == 32
 
-def test_hash_refresh_token_is_deterministic():
-    token = 'refresh-token'
+    def test_same_refresh_token_has_same_hash(self) -> None:
+        token = generate_refresh_token()
 
-    first_hash = hash_refresh_token(token)
-    second_hash = hash_refresh_token(token)
+        first_hash = hash_refresh_token(token)
+        second_hash = hash_refresh_token(token)
 
-    assert first_hash == second_hash
+        assert first_hash == second_hash
 
+    def test_different_refresh_tokens_have_different_hashes(self) -> None:
+        first_token = generate_refresh_token()
+        second_token = generate_refresh_token()
 
-def test_different_refresh_tokens_have_different_hashes():
-    first_hash = hash_refresh_token('first-token')
-    second_hash = hash_refresh_token('second-token')
+        first_hash = hash_refresh_token(first_token)
+        second_hash = hash_refresh_token(second_token)
 
-    assert first_hash != second_hash
+        assert first_hash != second_hash

@@ -11,8 +11,20 @@ class APIException(Exception):
 
 
 class UserAlreadyExistError(APIException):
+    """Trying to create the second user with the same email."""
+
     def __init__(self, email: str) -> None:
         super().__init__(
             detail=f'Пользователь с почтой {email} уже существует',
             status_code=status.HTTP_409_CONFLICT,
+        )
+
+
+class InvalidAccessTokenError(APIException):
+    """Access token is invalid."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            detail='Invalid access token',
+            status_code=status.HTTP_401_UNAUTHORIZED,
         )

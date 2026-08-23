@@ -149,3 +149,21 @@ class AuthService:
         await self.session.commit()
 
         return access_token, new_refresh_token
+
+    async def logout(self, refresh_token: str | None) -> None:
+        if refresh_token is None:
+            return
+
+        token_hash = hash_refresh_token(refresh_token)
+
+        stored_token = await self.refresh_tokens.get_by_hash(token_hash)
+
+        if stored_token is None:
+            return
+
+        await self.refresh_tokens.revoke(stored_token)
+        await self.session.commit()
+
+    async def logout_all(self, user_id: uuid.UUID) -> None:
+        await self.refresh_tokens.revoke_all_for_user(user_id)
+        await self.session.commit()

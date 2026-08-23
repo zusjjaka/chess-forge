@@ -1,26 +1,30 @@
-from unittest.mock import AsyncMock, Mock, patch
-from uuid import uuid4
+import uuid
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
 from api.dependencies import get_current_user
+from exceptions import InvalidAccessTokenError
+from models.user import User
 
 
 @pytest.mark.asyncio
-async def test_get_current_user():
-    user_id = uuid4()
-    user = Mock()
-    user.id = user_id
+async def test_get_current_user_returns_user() -> None:
+    user_id = uuid.uuid4()
+
+    user = User(
+        id=user_id,
+        email='user@example.com',
+        password_hash='password-hash',
+    )
 
     credentials = HTTPAuthorizationCredentials(
         scheme='Bearer',
         credentials='valid-token',
     )
 
-    repository = Mock()
-    repository.get_by_id = AsyncMock(return_value=user)
+    session = AsyncMock()
 
     with (
         patch(
@@ -28,77 +32,83 @@ async def test_get_current_user():
             return_value={'sub': str(user_id)},
         ),
         patch(
-            'api.dependencies.UserRepository',
-            return_value=repository,
+            'api.dependencies.UserRepository.get_by_id',
+            new_callable=AsyncMock,
+            return_value=user,
         ),
     ):
-        result = await get_current_user(
-            credentials=credentials,
-            session=Mock(),
-        )
+        result = await get_current_user(credentials, session)
 
     assert result is user
 
-    repository.get_by_id.assert_awaited_once_with(user_id)
-
 
 @pytest.mark.asyncio
-async def test_get_current_user_invalid_uuid():
+async def test_get_current_user_invalid_token() -> None:
     credentials = HTTPAuthorizationCredentials(
         scheme='Bearer',
         credentials='invalid-token',
     )
 
+    session = AsyncMock()
+
     with (
         patch(
             'api.dependencies.decode_access_token',
-            return_value={'sub': 'not-a-uuid'},
+            side_effect=ValueError,
         ),
-        pytest.raises(HTTPException) as exc_info,
+        pytest.raises(InvalidAccessTokenError),
     ):
-        await get_current_user(
-            credentials=credentials,
-            session=Mock(),
-        )
-
-    assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == 'Invalid access token'
+        await get_current_user(credentials, session)
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_missing_sub():
+async def test_get_current_user_missing_sub() -> None:
     credentials = HTTPAuthorizationCredentials(
         scheme='Bearer',
         credentials='valid-token',
     )
+
+    session = AsyncMock()
 
     with (
         patch(
             'api.dependencies.decode_access_token',
             return_value={},
         ),
-        pytest.raises(HTTPException) as exc_info,
+        pytest.raises(InvalidAccessTokenError),
     ):
-        await get_current_user(
-            credentials=credentials,
-            session=Mock(),
-        )
-
-    assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == 'Invalid access token'
+        await get_current_user(credentials, session)
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_not_found():
-    user_id = uuid4()
+async def test_get_current_user_invalid_user_id() -> None:
+    credentials = HTTPAuthorizationCredentials(
+        scheme='Bearer',
+        credentials='valid-token',
+    )
+
+    session = AsyncMock()
+
+    with (
+        patch(
+            'api.dependencies.decode_access_token',
+            return_value={'sub': 'not-a-uuid'},
+        ),
+        pytest.raises(InvalidAccessTokenError),
+    ):
+        await get_current_user(credentials, session)
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_user_not_found() -> None:
+    user_id = uuid.uuid4()
 
     credentials = HTTPAuthorizationCredentials(
         scheme='Bearer',
         credentials='valid-token',
     )
 
-    repository = Mock()
-    repository.get_by_id = AsyncMock(return_value=None)
+    session = AsyncMock()
 
     with (
         patch(
@@ -106,15 +116,10 @@ async def test_get_current_user_not_found():
             return_value={'sub': str(user_id)},
         ),
         patch(
-            'api.dependencies.UserRepository',
-            return_value=repository,
+            'api.dependencies.UserRepository.get_by_id',
+            new_callable=AsyncMock,
+            return_value=None,
         ),
-        pytest.raises(HTTPException) as exc_info,
+        pytest.raises(InvalidAccessTokenError),
     ):
-        await get_current_user(
-            credentials=credentials,
-            session=Mock(),
-        )
-
-    assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == 'User not found'
+        await get_current_user(credentials, session)
