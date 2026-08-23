@@ -1,8 +1,6 @@
 import uuid
 
 import jwt
-from db.session import get_db_session
-from exceptions import InvalidAccessTokenError
 from fastapi import (
     Depends,
 )
@@ -10,9 +8,12 @@ from fastapi.security import (
     HTTPAuthorizationCredentials,
     HTTPBearer,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from db.session import get_db_session
+from exceptions import InvalidAccessTokenError
 from models.user import User
 from repositories.users import UserRepository
-from sqlalchemy.ext.asyncio import AsyncSession
 from utils.tokens import decode_access_token
 
 bearer_scheme = HTTPBearer()

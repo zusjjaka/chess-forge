@@ -5,16 +5,17 @@ from datetime import (
     timedelta,
 )
 
-from core.config import get_settings
-from exceptions import UserAlreadyExistError
 from fastapi import (
     HTTPException,
     status,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.config import get_settings
+from exceptions import UserAlreadyExistError
 from models.user import User
 from repositories.refresh_tokens import RefreshTokenRepository
 from repositories.users import UserRepository
-from sqlalchemy.ext.asyncio import AsyncSession
 from utils.security import (
     hash_password,
     verify_password,
