@@ -21,7 +21,7 @@ repos:
 
       - id: mypy
         name: Mypy
-        entry: uv run mypy src
+        entry: uv run mypy backend
         language: system
         pass_filenames: false
         types: [python]
