@@ -4,97 +4,72 @@ from fastapi import status
 class APIException(Exception):
     """Base class for exception, that must be handled."""
 
-    def __init__(self, detail: str, status_code: int) -> None:
-        self.detail = detail
-        self.status_code = status_code
-        super().__init__(detail)
+    detail: str
+    status_code: int
+
+    def __init__(self, **context: object) -> None:
+        self.detail = self.detail.format(**context)
+        super().__init__(self.detail)
 
 
 class UserAlreadyExistError(APIException):
-    """Trying to create the second user with the same email."""
+    """User with the given email already exists."""
 
-    def __init__(self, email: str) -> None:
-        super().__init__(
-            detail=f'Пользователь с почтой {email} уже существует',
-            status_code=status.HTTP_409_CONFLICT,
-        )
+    detail = 'Пользователь с почтой {email} уже существует'
+    status_code = status.HTTP_409_CONFLICT
 
 
 class InvalidCredentialsError(APIException):
-    """Invalid creditionals email:password."""
+    """Invalid credentials email:password."""
 
-    def __init__(self) -> None:
-        super().__init__(
-            detail='Invalid credentials',
-            status_code=status.HTTP_401_UNAUTHORIZED
-        )
+    detail = 'Invalid credentials'
+    status_code = status.HTTP_401_UNAUTHORIZED
 
 
 class InvalidAccessTokenError(APIException):
     """Access token is invalid."""
 
-    def __init__(self) -> None:
-        super().__init__(
-            detail='Invalid access token',
-            status_code=status.HTTP_401_UNAUTHORIZED,
-        )
+    detail = 'Invalid access token'
+    status_code = status.HTTP_401_UNAUTHORIZED
 
 
 class RefreshTokenExpiredError(APIException):
-    """Refresh token have been expired."""
+    """Refresh token has expired."""
 
-    def __init__(self) -> None:
-        super().__init__(
-            detail='Refresh token expired',
-            status_code=status.HTTP_401_UNAUTHORIZED
-        )
+    detail = 'Refresh token expired'
+    status_code = status.HTTP_401_UNAUTHORIZED
 
 
 class RefreshTokenReuseError(APIException):
     """Refresh token reuse was detected."""
 
-    def __init__(self) -> None:
-        super().__init__(
-            detail='Refresh token reuse detected',
-            status_code=status.HTTP_401_UNAUTHORIZED,
-        )
+    detail = 'Refresh token reuse detected'
+    status_code = status.HTTP_401_UNAUTHORIZED
 
 
 class RefreshTokenInvalidError(APIException):
     """Refresh token is invalid."""
 
-    def __init__(self) -> None:
-        super().__init__(
-            detail='Invalid refresh token',
-            status_code=status.HTTP_401_UNAUTHORIZED,
-        )
+    detail = 'Invalid refresh token'
+    status_code = status.HTTP_401_UNAUTHORIZED
 
 
 class EmailNotConfirmedError(APIException):
-    """Access token is invalid."""
+    """Email is not confirmed."""
 
-    def __init__(self) -> None:
-        super().__init__(
-            detail='Email is not verified',
-            status_code=status.HTTP_403_FORBIDDEN,
-        )
+    detail = 'Email is not verified'
+    status_code = status.HTTP_403_FORBIDDEN
 
 
 class VerificationCodeInvalidError(APIException):
-    """Validation code is invalid."""
+    """Verification code is invalid."""
 
-    def __init__(self) -> None:
-        super().__init__(
-            detail='Invalid or expired verification code',
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
+    detail = 'Invalid or expired verification code'
+    status_code = status.HTTP_400_BAD_REQUEST
 
 
 class PasswordInvalidError(APIException):
     """Current password is invalid."""
 
-    def __init__(self) -> None:
-        super().__init__(
-            detail='Current password is invalid',
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
+    detail = 'Current password is invalid'
+    status_code = status.HTTP_400_BAD_REQUEST
