@@ -65,7 +65,8 @@ jobs:
       - name: Run migrations
         working-directory: backend/auth
         env:
-          DATABASE_URL: postgresql+psycopg://auth_test:root@localhost:5432/auth_test
+          DATABASE__URL: postgresql+psycopg://auth_test:root@localhost:5432/auth_test
+          RABBITMQ__URL: amqp://guest:guest@localhost:5672//
         run: uv run alembic upgrade head
 
       - name: Pytest
@@ -100,4 +101,11 @@ jobs:
 
       - name: Pytest
         working-directory: backend/email_sender
+        env:
+          SMTP_HOST: localhost
+          SMTP_PORT: 587
+          SMTP_USERNAME: test
+          SMTP_PASSWORD: test
+          FROM_EMAIL: test@example.com
+          BROKER_URL: amqp://guest:guest@localhost:5672//
         run: uv run pytest
