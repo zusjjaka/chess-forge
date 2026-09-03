@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.config import get_settings
 from exceptions import (
     InvalidCredentialsError,
+    PasswordInvalidError,
     RefreshTokenExpiredError,
     RefreshTokenInvalidError,
     RefreshTokenReuseError,
@@ -202,3 +203,20 @@ class AuthService:
             code=code,
             message_id=reset_code.id
         )
+
+    async def change_user_password(self,
+                                   user_id: uuid.UUID,
+                                   current_password: str,
+                                   new_password: str
+                                   ) -> None:
+        user = await self.users.get_by_id(user_id)
+
+        if user is None:
+            raise PasswordInvalidError
+
+        if not verify_password(current_password, user.password_hash):
+            raise PasswordInvalidError
+
+        user.password_hash = hash_password(new_password)
+
+        await self.session.commit()

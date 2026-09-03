@@ -18,6 +18,7 @@ from exceptions import RefreshTokenInvalidError
 from models.user import User
 from schemas.auth import (
     LoginRequest,
+    PasswordChange,
     PasswordResetConfirm,
     PasswordResetRequest,
     RegisterRequest,
@@ -200,4 +201,19 @@ async def confirm_password_reset(
         email=data.email,
         code=data.code,
         password=data.password,
+    )
+
+
+@router.post(
+    '/password/change',
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def change_password(data: PasswordChange,
+                          current_user: User = Depends(get_current_user),
+                          service: AuthService = Depends(get_auth_service)
+                          ) -> None:
+    await service.change_user_password(
+        user_id=current_user.id,
+        current_password=data.current_password,
+        new_password=data.new_password,
     )

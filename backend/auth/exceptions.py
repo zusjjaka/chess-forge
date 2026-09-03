@@ -25,7 +25,8 @@ class InvalidCredentialsError(APIException):
 
     def __init__(self) -> None:
         super().__init__(
-            detail='Invalid credentials', status_code=status.HTTP_401_UNAUTHORIZED
+            detail='Invalid credentials',
+            status_code=status.HTTP_401_UNAUTHORIZED
         )
 
 
@@ -44,7 +45,8 @@ class RefreshTokenExpiredError(APIException):
 
     def __init__(self) -> None:
         super().__init__(
-            detail='Refresh token expired', status_code=status.HTTP_401_UNAUTHORIZED
+            detail='Refresh token expired',
+            status_code=status.HTTP_401_UNAUTHORIZED
         )
 
 
@@ -84,5 +86,15 @@ class VerificationCodeInvalidError(APIException):
     def __init__(self) -> None:
         super().__init__(
             detail='Invalid or expired verification code',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class PasswordInvalidError(APIException):
+    """Current password is invalid."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            detail='Current password is invalid',
             status_code=status.HTTP_400_BAD_REQUEST,
         )

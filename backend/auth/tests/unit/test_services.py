@@ -11,6 +11,7 @@ from exceptions import (
     RefreshTokenReuseError,
     UserAlreadyExistError,
     VerificationCodeInvalidError,
+    PasswordInvalidError,
 )
 from models.refresh_token import RefreshToken
 from models.user import User
@@ -24,6 +25,11 @@ from services.verification_code import (
 )
 from publishers.email import EmailPublisher
 from services.auth import AuthService
+
+from utils.security import (
+    verify_password,
+    hash_password,
+)
 
 
 @pytest.fixture
@@ -1245,3 +1251,71 @@ async def test_verify_email_rejects_invalid_code(
     mark_as_used.assert_not_awaited()
 
     verification_service.session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_change_user_password(
+    service: AuthService,
+    user: User,
+) -> None:
+    current_password = 'current-password'
+    new_password = 'new-password'
+
+    user.password_hash = hash_password(current_password)
+
+    service.users.get_by_id = AsyncMock(return_value=user)
+    service.session.commit = AsyncMock()
+
+    await service.change_user_password(
+        user_id=user.id,
+        current_password=current_password,
+        new_password=new_password,
+    )
+
+    assert verify_password(new_password, user.password_hash)
+    assert not verify_password(current_password, user.password_hash)
+
+    service.users.get_by_id.assert_awaited_once_with(user.id)
+    service.session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_change_user_password_user_not_found(
+    service: AuthService,
+    user: User,
+) -> None:
+    service.users.get_by_id = AsyncMock(return_value=None)
+    service.session.commit = AsyncMock()
+
+    with pytest.raises(PasswordInvalidError):
+        await service.change_user_password(
+            user_id=user.id,
+            current_password='current-password',
+            new_password='new-password',
+        )
+
+    service.users.get_by_id.assert_awaited_once_with(user.id)
+    service.session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_change_user_password_invalid_current_password(
+    service: AuthService,
+    user: User,
+) -> None:
+    user.password_hash = hash_password('correct-password')
+
+    service.users.get_by_id = AsyncMock(return_value=user)
+    service.session.commit = AsyncMock()
+
+    with pytest.raises(PasswordInvalidError):
+        await service.change_user_password(
+            user_id=user.id,
+            current_password='wrong-password',
+            new_password='new-password',
+        )
+
+    assert verify_password('correct-password', user.password_hash)
+
+    service.users.get_by_id.assert_awaited_once_with(user.id)
+    service.session.commit.assert_not_awaited()

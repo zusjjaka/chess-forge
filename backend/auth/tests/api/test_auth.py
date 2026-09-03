@@ -1278,3 +1278,172 @@ async def test_confirm_password_reset_rejects_password_mismatch(
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_change_password(
+    client: AsyncClient,
+    session: AsyncSession,
+) -> None:
+    email = 'change-password@example.com'
+    password = 'old-password'
+    new_password = 'new-password'
+
+    await register_user(
+        client,
+        email=email,
+        password=password,
+    )
+
+    user = await get_user(
+        session,
+        email=email,
+    )
+
+    user.is_email_verified = True
+    await session.commit()
+
+    login = await login_user(
+        client,
+        email=email,
+        password=password,
+    )
+
+    response = await client.post(
+        '/api/v1/auth/password/change',
+        headers={
+            'Authorization': f"Bearer {login['access_token']}",
+        },
+        json={
+            'current_password': password,
+            'new_password': new_password,
+            'new_password_repeat': new_password,
+        },
+    )
+
+    assert response.status_code == 204
+    assert response.content == b''
+
+    old_login_response = await client.post(
+        '/api/v1/auth/login',
+        json={
+            'email': email,
+            'password': password,
+        },
+    )
+
+    assert old_login_response.status_code == 401
+
+    new_login_response = await client.post(
+        '/api/v1/auth/login',
+        json={
+            'email': email,
+            'password': new_password,
+        },
+    )
+
+    assert new_login_response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_change_password_with_invalid_current_password(
+    client: AsyncClient,
+    session: AsyncSession,
+) -> None:
+    email = 'change-password-invalid@example.com'
+    password = 'old-password'
+    new_password = 'new-password'
+
+    await register_user(
+        client,
+        email=email,
+        password=password,
+    )
+
+    user = await get_user(
+        session,
+        email=email,
+    )
+
+    user.is_email_verified = True
+    await session.commit()
+
+    login = await login_user(
+        client,
+        email=email,
+        password=password,
+    )
+
+    response = await client.post(
+        '/api/v1/auth/password/change',
+        headers={
+            'Authorization': f"Bearer {login['access_token']}",
+        },
+        json={
+            'current_password': 'wrong-password',
+            'new_password': new_password,
+            'new_password_repeat': new_password,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()['detail'] == 'Current password is invalid'
+
+
+@pytest.mark.asyncio
+async def test_change_password_with_mismatched_passwords(
+    client: AsyncClient,
+    session: AsyncSession,
+) -> None:
+    email = 'change-password-mismatch@example.com'
+    password = 'old-password'
+
+    await register_user(
+        client,
+        email=email,
+        password=password,
+    )
+
+    user = await get_user(
+        session,
+        email=email,
+    )
+
+    user.is_email_verified = True
+    await session.commit()
+
+    login = await login_user(
+        client,
+        email=email,
+        password=password,
+    )
+
+    response = await client.post(
+        '/api/v1/auth/password/change',
+        headers={
+            'Authorization': f"Bearer {login['access_token']}",
+        },
+        json={
+            'current_password': password,
+            'new_password': 'new-password',
+            'new_password_repeat': 'different-password',
+        },
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_change_password_without_authentication(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        '/api/v1/auth/password/change',
+        json={
+            'current_password': 'old-password',
+            'new_password': 'new-password',
+            'new_password_repeat': 'new-password',
+        },
+    )
+
+    assert response.status_code == 401
