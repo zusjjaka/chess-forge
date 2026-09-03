@@ -7,6 +7,12 @@ from fastapi.security import HTTPAuthorizationCredentials
 from api.dependencies import (
     get_current_user,
     get_unverified_current_user,
+    get_password_reset_service,
+    get_email_verification_service,
+)
+from services.verification_code import (
+    PasswordResetService,
+    EmailVerificationService,
 )
 from exceptions import (
     EmailNotConfirmedError,
@@ -159,3 +165,21 @@ async def test_get_current_user_rejects_unverified_user(
 
     with pytest.raises(EmailNotConfirmedError):
         await get_current_user(user)
+
+
+def test_get_password_reset_service(
+    session: AsyncMock,
+) -> None:
+    service = get_password_reset_service(session)
+
+    assert isinstance(service, PasswordResetService)
+    assert service.session is session
+
+
+def test_get_password_reset_service(
+    session: AsyncMock,
+) -> None:
+    service = get_email_verification_service(session)
+
+    assert isinstance(service, EmailVerificationService)
+    assert service.session is session

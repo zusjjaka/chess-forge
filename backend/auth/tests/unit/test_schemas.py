@@ -7,6 +7,8 @@ from pydantic import ValidationError
 from schemas.auth import (
     EmailApprovalRequest,
     LoginRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
     RegisterRequest,
     RegisterResponse,
     TokenResponse,
@@ -296,4 +298,102 @@ class TestEmailMessage:
                 to='user@example.com',
                 data={'code': '123456'},
                 message_id='not-a-uuid',
+            )
+
+
+class TestPasswordResetRequest:
+    def test_valid_data(self) -> None:
+        data = PasswordResetRequest(
+            email='user@example.com',
+        )
+
+        assert data.email == 'user@example.com'
+
+    def test_invalid_email(self) -> None:
+        with pytest.raises(ValidationError):
+            PasswordResetRequest(
+                email='not-an-email',
+            )
+
+
+class TestPasswordResetConfirm:
+    def test_valid_data(self) -> None:
+        data = PasswordResetConfirm(
+            email='user@example.com',
+            code='123456',
+            password='password123',
+            password_repeat='password123',
+        )
+
+        assert data.email == 'user@example.com'
+        assert data.code == '123456'
+        assert data.password == 'password123'
+        assert data.password_repeat == 'password123'
+
+    def test_invalid_email(self) -> None:
+        with pytest.raises(ValidationError):
+            PasswordResetConfirm(
+                email='not-an-email',
+                code='123456',
+                password='password123',
+                password_repeat='password123',
+            )
+
+    def test_code_too_short(self) -> None:
+        with pytest.raises(ValidationError):
+            PasswordResetConfirm(
+                email='user@example.com',
+                code='12345',
+                password='password123',
+                password_repeat='password123',
+            )
+
+    def test_code_too_long(self) -> None:
+        with pytest.raises(ValidationError):
+            PasswordResetConfirm(
+                email='user@example.com',
+                code='1234567',
+                password='password123',
+                password_repeat='password123',
+            )
+
+    def test_code_must_contain_only_digits(self) -> None:
+        with pytest.raises(ValidationError):
+            PasswordResetConfirm(
+                email='user@example.com',
+                code='12345a',
+                password='password123',
+                password_repeat='password123',
+            )
+
+    def test_password_too_short(self) -> None:
+        with pytest.raises(ValidationError):
+            PasswordResetConfirm(
+                email='user@example.com',
+                code='123456',
+                password='short',
+                password_repeat='short',
+            )
+
+    def test_password_too_long(self) -> None:
+        password = 'a' * 129
+
+        with pytest.raises(ValidationError):
+            PasswordResetConfirm(
+                email='user@example.com',
+                code='123456',
+                password=password,
+                password_repeat=password,
+            )
+
+    def test_passwords_do_not_match(self) -> None:
+        with pytest.raises(
+            ValueError,
+            match='Passwords do not match',
+        ):
+            PasswordResetConfirm(
+                email='user@example.com',
+                code='123456',
+                password='password123',
+                password_repeat='password456',
             )

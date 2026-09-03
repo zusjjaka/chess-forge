@@ -21,16 +21,19 @@ from models.user import User
 from publishers.email import EmailPublisher
 from repositories.user import UserRepository
 from services.auth import AuthService
-from services.verification_code import EmailVerificationService
+from services.verification_code import (
+    EmailVerificationService,
+    PasswordResetService,
+)
 from utils.tokens import decode_access_token
 
 bearer_scheme = HTTPBearer()
 
 
 async def get_unverified_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    session: AsyncSession = Depends(get_db_session),
-) -> User:
+        credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+        session: AsyncSession = Depends(get_db_session)
+        ) -> User:
     try:
         payload = decode_access_token(credentials.credentials)
         user_id = uuid.UUID(payload['sub'])
@@ -45,26 +48,31 @@ async def get_unverified_current_user(
     return user
 
 
-def get_current_user(user: User = Depends(get_unverified_current_user)) -> User:
+def get_current_user(user: User = Depends(get_unverified_current_user)
+                     ) -> User:
     if not user.is_email_verified:
         raise EmailNotConfirmedError
 
     return user
 
 
-def get_email_publisher(request: Request) -> EmailPublisher:
+def get_email_publisher(request: Request
+                        ) -> EmailPublisher:
     email_publisher: typing.Any = request.app.state.email_publisher
     return typing.cast(EmailPublisher, email_publisher)
 
 
-def get_auth_service(
-    session: AsyncSession = Depends(get_db_session),
-    email_publisher: EmailPublisher = Depends(get_email_publisher),
-) -> AuthService:
+def get_auth_service(session: AsyncSession = Depends(get_db_session),
+                     email_publisher: EmailPublisher = Depends(get_email_publisher)
+                     ) -> AuthService:
     return AuthService(session=session, email_publisher=email_publisher)
 
 
-def get_email_verification_service(
-    session: AsyncSession = Depends(get_db_session),
-) -> EmailVerificationService:
+def get_email_verification_service(session: AsyncSession = Depends(get_db_session)
+                                   ) -> EmailVerificationService:
     return EmailVerificationService(session=session)
+
+
+def get_password_reset_service(session: AsyncSession = Depends(get_db_session)
+                               ) -> PasswordResetService:
+    return PasswordResetService(session=session)

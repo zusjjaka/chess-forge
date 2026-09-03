@@ -14,9 +14,30 @@ from exceptions import (
 )
 from models.refresh_token import RefreshToken
 from models.user import User
+from models.verification_code import (
+    EmailVerificationCode,
+    PasswordResetCode,
+)
+from services.verification_code import (
+    PasswordResetService,
+    EmailVerificationService,
+)
 from publishers.email import EmailPublisher
 from services.auth import AuthService
-from services.verification_code import EmailVerificationService
+
+
+@pytest.fixture
+def password_reset_service(
+    session: AsyncMock,
+) -> PasswordResetService:
+    return PasswordResetService(session=session)
+
+
+@pytest.fixture
+def email_verification_service(
+    session: AsyncMock,
+) -> EmailVerificationService:
+    return EmailVerificationService(session=session)
 
 
 @pytest.fixture
@@ -89,7 +110,7 @@ async def test_register_creates_user(
             return_value='123456',
         ),
         patch.object(
-            service.codes,
+            service.email_codes,
             'create',
             new_callable=AsyncMock,
             return_value=verification_code,
@@ -180,7 +201,7 @@ async def test_register_updates_existing_unverified_user(
             return_value='654321',
         ),
         patch.object(
-            service.codes,
+            service.email_codes,
             'create',
             new_callable=AsyncMock,
             return_value=verification_code,
@@ -236,7 +257,7 @@ async def test_register_hashes_password(
             return_value=user,
         ) as create_user,
         patch.object(
-            service.codes,
+            service.email_codes,
             'create',
             new_callable=AsyncMock,
             return_value=verification_code,
@@ -800,6 +821,426 @@ async def test_verify_rejects_missing_user(
         )
 
     get_user.assert_awaited_once_with(user.id)
+
+    mark_as_used.assert_not_awaited()
+
+    verification_service.session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_request_password_reset(
+    service: AuthService,
+    user: User,
+) -> None:
+    reset_code = type(
+        'PasswordResetCode',
+        (),
+        {'id': uuid4()},
+    )()
+
+    with (
+        patch.object(
+            service.users,
+            'get_by_email',
+            new_callable=AsyncMock,
+            return_value=user,
+        ) as get_user,
+        patch(
+            'services.auth.generate_verification_code',
+            return_value='123456',
+        ) as generate_code,
+        patch(
+            'services.auth.hash_secret',
+            return_value=b'code-hash',
+        ) as hash_secret,
+        patch.object(
+            service.passw_codes,
+            'create',
+            new_callable=AsyncMock,
+            return_value=reset_code,
+        ) as create_code,
+    ):
+        await service.request_password_reset(
+            email=user.email,
+        )
+
+    get_user.assert_awaited_once_with(user.email)
+    generate_code.assert_called_once()
+    hash_secret.assert_called_once_with('123456')
+
+    create_code.assert_awaited_once()
+
+    call_kwargs = create_code.await_args.kwargs
+
+    assert call_kwargs['user_id'] == user.id
+    assert call_kwargs['code_hash'] == b'code-hash'
+    assert call_kwargs['expires_at'] > datetime.now(UTC)
+
+    service.session.commit.assert_awaited_once()
+
+    service.email_publisher.publish_password_reset.assert_awaited_once_with(
+        email=user.email,
+        code='123456',
+        message_id=reset_code.id,
+    )
+
+
+@pytest.mark.asyncio
+async def test_request_password_reset_does_nothing_for_unknown_user(
+    service: AuthService,
+) -> None:
+    with (
+        patch.object(
+            service.users,
+            'get_by_email',
+            new_callable=AsyncMock,
+            return_value=None,
+        ) as get_user,
+        patch(
+            'services.auth.generate_verification_code',
+        ) as generate_code,
+        patch.object(
+            service.passw_codes,
+            'create',
+            new_callable=AsyncMock,
+        ) as create_code,
+    ):
+        await service.request_password_reset(
+            email='unknown@example.com',
+        )
+
+    get_user.assert_awaited_once_with('unknown@example.com')
+    generate_code.assert_not_called()
+    create_code.assert_not_awaited()
+
+    service.session.commit.assert_not_awaited()
+    service.email_publisher.publish_password_reset.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_password_reset(
+    password_reset_service: PasswordResetService,
+    user: User,
+) -> None:
+    reset_code = type(
+        'PasswordResetCode',
+        (),
+        {'id': uuid4()},
+    )()
+
+    with (
+        patch(
+            'services.verification_code.hash_secret',
+            return_value=b'code-hash',
+        ) as hash_secret,
+        patch(
+            'services.verification_code.hash_password',
+            return_value='new-password-hash',
+        ) as hash_password,
+        patch.object(
+            password_reset_service.users,
+            'get_by_email',
+            new_callable=AsyncMock,
+            return_value=user,
+        ) as get_user,
+        patch.object(
+            password_reset_service.codes,
+            'get_valid_by_user_id',
+            new_callable=AsyncMock,
+            return_value=reset_code,
+        ) as get_code,
+        patch.object(
+            password_reset_service.refresh_tokens,
+            'revoke_all_for_user',
+            new_callable=AsyncMock,
+        ) as revoke_all,
+        patch.object(
+            password_reset_service.codes,
+            'mark_as_used',
+            new_callable=AsyncMock,
+        ) as mark_as_used,
+    ):
+        await password_reset_service.reset(
+            email=user.email,
+            code='123456',
+            password='new-password',
+        )
+
+    hash_secret.assert_called_once_with('123456')
+    get_user.assert_awaited_once_with(user.email)
+
+    get_code.assert_awaited_once_with(
+        user_id=user.id,
+        code_hash=b'code-hash',
+    )
+
+    hash_password.assert_called_once_with('new-password')
+
+    assert user.password_hash == 'new-password-hash'
+
+    revoke_all.assert_awaited_once_with(user.id)
+    mark_as_used.assert_awaited_once_with(reset_code.id)
+
+    password_reset_service.session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_password_reset_rejects_unknown_user(
+    password_reset_service: PasswordResetService,
+) -> None:
+    with (
+        patch(
+            'services.verification_code.hash_secret',
+            return_value=b'code-hash',
+        ),
+        patch.object(
+            password_reset_service.users,
+            'get_by_email',
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
+        patch.object(
+            password_reset_service.codes,
+            'get_valid_by_user_id',
+            new_callable=AsyncMock,
+        ) as get_code,
+        patch.object(
+            password_reset_service.refresh_tokens,
+            'revoke_all_for_user',
+            new_callable=AsyncMock,
+        ) as revoke_all,
+        patch.object(
+            password_reset_service.codes,
+            'mark_as_used',
+            new_callable=AsyncMock,
+        ) as mark_as_used,
+        patch(
+            'services.verification_code.hash_password',
+        ) as hash_password,
+        pytest.raises(VerificationCodeInvalidError),
+    ):
+        await password_reset_service.reset(
+            email='unknown@example.com',
+            code='123456',
+            password='new-password',
+        )
+
+    hash_password.assert_not_called()
+    get_code.assert_not_awaited()
+    revoke_all.assert_not_awaited()
+    mark_as_used.assert_not_awaited()
+
+    password_reset_service.session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_password_reset_rejects_invalid_code(
+    password_reset_service: PasswordResetService,
+    user: User,
+) -> None:
+    with (
+        patch(
+            'services.verification_code.hash_secret',
+            return_value=b'wrong-code-hash',
+        ) as hash_secret,
+        patch.object(
+            password_reset_service.users,
+            'get_by_email',
+            new_callable=AsyncMock,
+            return_value=user,
+        ),
+        patch.object(
+            password_reset_service.codes,
+            'get_valid_by_user_id',
+            new_callable=AsyncMock,
+            return_value=None,
+        ) as get_code,
+        patch(
+            'services.verification_code.hash_password',
+        ) as hash_password,
+        patch.object(
+            password_reset_service.refresh_tokens,
+            'revoke_all_for_user',
+            new_callable=AsyncMock,
+        ) as revoke_all,
+        patch.object(
+            password_reset_service.codes,
+            'mark_as_used',
+            new_callable=AsyncMock,
+        ) as mark_as_used,
+        pytest.raises(VerificationCodeInvalidError),
+    ):
+        await password_reset_service.reset(
+            email=user.email,
+            code='wrong-code',
+            password='new-password',
+        )
+
+    hash_secret.assert_called_once_with('wrong-code')
+
+    get_code.assert_awaited_once_with(
+        user_id=user.id,
+        code_hash=b'wrong-code-hash',
+    )
+
+    hash_password.assert_not_called()
+    revoke_all.assert_not_awaited()
+    mark_as_used.assert_not_awaited()
+
+    password_reset_service.session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_verify_email(
+    verification_service: EmailVerificationService,
+    user: User,
+) -> None:
+    verification_code = type(
+        'EmailVerificationCode',
+        (),
+        {'id': uuid4()},
+    )()
+
+    with (
+        patch(
+            'services.verification_code.hash_secret',
+            return_value=b'code-hash',
+        ) as hash_secret,
+        patch.object(
+            verification_service.users,
+            'get_by_id',
+            new_callable=AsyncMock,
+            return_value=user,
+        ) as get_user,
+        patch.object(
+            verification_service.codes,
+            'get_valid_by_user_id',
+            new_callable=AsyncMock,
+            return_value=verification_code,
+        ) as get_code,
+        patch.object(
+            verification_service.codes,
+            'mark_as_used',
+            new_callable=AsyncMock,
+        ) as mark_as_used,
+    ):
+        await verification_service.verify(
+            user_id=user.id,
+            code='123456',
+        )
+
+    hash_secret.assert_called_once_with('123456')
+
+    get_user.assert_awaited_once_with(user.id)
+
+    get_code.assert_awaited_once_with(
+        user_id=user.id,
+        code_hash=b'code-hash',
+    )
+
+    assert user.is_email_verified is True
+
+    mark_as_used.assert_awaited_once_with(
+        verification_code.id,
+    )
+
+    verification_service.session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_verify_email_rejects_unknown_user(
+    verification_service: EmailVerificationService,
+) -> None:
+    verification_code = type(
+        'EmailVerificationCode',
+        (),
+        {'id': uuid4()},
+    )()
+
+    user_id = uuid4()
+
+    with (
+        patch(
+            'services.verification_code.hash_secret',
+            return_value=b'code-hash',
+        ),
+        patch.object(
+            verification_service.codes,
+            'get_valid_by_user_id',
+            new_callable=AsyncMock,
+            return_value=verification_code,
+        ) as get_code,
+        patch.object(
+            verification_service.users,
+            'get_by_id',
+            new_callable=AsyncMock,
+            return_value=None,
+        ) as get_user,
+        patch.object(
+            verification_service.codes,
+            'mark_as_used',
+            new_callable=AsyncMock,
+        ) as mark_as_used,
+        pytest.raises(VerificationCodeInvalidError),
+    ):
+        await verification_service.verify(
+            user_id=user_id,
+            code='123456',
+        )
+
+    get_code.assert_awaited_once_with(
+        user_id=user_id,
+        code_hash=b'code-hash',
+    )
+
+    get_user.assert_awaited_once_with(user_id)
+
+    mark_as_used.assert_not_awaited()
+
+    verification_service.session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_verify_email_rejects_invalid_code(
+    verification_service: EmailVerificationService,
+    user: User,
+) -> None:
+    with (
+        patch(
+            'services.verification_code.hash_secret',
+            return_value=b'wrong-code-hash',
+        ) as hash_secret,
+        patch.object(
+            verification_service.users,
+            'get_by_id',
+            new_callable=AsyncMock
+        ) as get_user,
+        patch.object(
+            verification_service.codes,
+            'get_valid_by_user_id',
+            new_callable=AsyncMock,
+            return_value=None,
+        ) as get_code,
+        patch.object(
+            verification_service.codes,
+            'mark_as_used',
+            new_callable=AsyncMock,
+        ) as mark_as_used,
+        pytest.raises(VerificationCodeInvalidError),
+    ):
+        await verification_service.verify(
+            user_id=user.id,
+            code='wrong-code',
+        )
+
+    hash_secret.assert_called_once_with('wrong-code')
+
+    get_user.assert_not_awaited()
+
+    get_code.assert_awaited_once_with(
+        user_id=user.id,
+        code_hash=b'wrong-code-hash',
+    )
 
     mark_as_used.assert_not_awaited()
 

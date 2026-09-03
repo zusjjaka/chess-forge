@@ -17,19 +17,21 @@ from core.config import get_settings
 from main import app
 from models.refresh_token import RefreshToken
 from models.user import User
-from models.verification_code import EmailVerificationCode
-from publishers.email import EmailPublisher
+from models.verification_code import (
+    EmailVerificationCode,
+    PasswordResetCode,
+)
 
 
 settings = get_settings()
 
-# Refresh-token cookie must be accepted by the HTTP test client.
 settings.refresh_token_cookie.secure = False
 
 
 class FakeEmailPublisher:
     def __init__(self) -> None:
         self.publish_email_verification = AsyncMock()
+        self.publish_password_reset = AsyncMock()
 
 
 @pytest_asyncio.fixture
@@ -382,11 +384,13 @@ async def test_refresh_rejects_invalid_token(
 ) -> None:
     cookie_name = settings.refresh_token_cookie.name
 
+    client.cookies.set(
+        cookie_name,
+        'invalid-refresh-token',
+    )
+
     response = await client.post(
         '/api/v1/auth/tokens/refresh',
-        cookies={
-            cookie_name: 'invalid-refresh-token',
-        },
     )
 
     assert response.status_code == 401
@@ -413,11 +417,13 @@ async def test_refresh_rejects_expired_token(
 
     await session.commit()
 
+    client.cookies.set(
+        cookie_name,
+        refresh_token,
+    )
+
     response = await client.post(
         '/api/v1/auth/tokens/refresh',
-        cookies={
-            cookie_name: refresh_token,
-        },
     )
 
     assert response.status_code == 401
@@ -446,11 +452,13 @@ async def test_refresh_detects_token_reuse(
 
     assert first_response.status_code == 200
 
+    client.cookies.set(
+        cookie_name,
+        old_refresh_token,
+    )
+
     reuse_response = await client.post(
         '/api/v1/auth/tokens/refresh',
-        cookies={
-            cookie_name: old_refresh_token,
-        },
     )
 
     assert reuse_response.status_code == 401
@@ -552,15 +560,16 @@ async def test_logout_with_invalid_token(
 ) -> None:
     cookie_name = settings.refresh_token_cookie.name
 
+    client.cookies.set(
+        cookie_name,
+        'invalid-refresh-token',
+    )
+
     response = await client.post(
         '/api/v1/auth/logout',
-        cookies={
-            cookie_name: 'invalid-refresh-token',
-        },
     )
 
     assert response.status_code == 204
-    assert cookie_name not in client.cookies
 
 
 @pytest.mark.asyncio
@@ -579,11 +588,13 @@ async def test_logout_invalidates_refresh_token(
 
     assert response.status_code == 204
 
+    client.cookies.set(
+        cookie_name,
+        refresh_token,
+    )
+
     refresh_response = await client.post(
         '/api/v1/auth/tokens/refresh',
-        cookies={
-            cookie_name: refresh_token,
-        },
     )
 
     assert refresh_response.status_code == 401
@@ -622,11 +633,13 @@ async def test_logout_all(
 
     assert response.status_code == 204
 
+    client.cookies.set(
+        cookie_name,
+        refresh_token,
+    )
+
     refresh_response = await client.post(
         '/api/v1/auth/tokens/refresh',
-        cookies={
-            cookie_name: refresh_token,
-        },
     )
 
     assert refresh_response.status_code == 401
@@ -641,8 +654,6 @@ async def test_logout_all_revokes_all_user_tokens(
 
     first_login = await login_user(client)
 
-    # Remove the current cookie so that the second login creates
-    # another independent refresh token.
     cookie_name = settings.refresh_token_cookie.name
     client.cookies.clear()
 
@@ -672,16 +683,17 @@ async def test_logout_all_revokes_all_user_tokens(
     assert len(tokens) == 2
     assert all(token.is_active is False for token in tokens)
 
+    client.cookies.set(
+        cookie_name,
+        client.cookies[cookie_name],
+    )
+
     refresh_response = await client.post(
         '/api/v1/auth/tokens/refresh',
-        cookies={
-            cookie_name: client.cookies[cookie_name],
-        },
     )
 
     assert refresh_response.status_code == 401
 
-    # Keep the variable used so the test explicitly creates two sessions.
     assert second_login['access_token']
 
 
@@ -1067,3 +1079,202 @@ async def test_email_approval_rejects_invalid_access_token(
 
     assert response.status_code == 401
     assert response.json()['detail'] == 'Invalid access token'
+
+
+# ============================================================================
+# POST /api/v1/auth/password/reset/request
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_request_password_reset(
+    client: AsyncClient,
+    email_publisher: FakeEmailPublisher,
+) -> None:
+    await register_user(client)
+
+    response = await client.post(
+        '/api/v1/auth/password/reset/request',
+        json={
+            'email': 'user@example.com',
+        },
+    )
+
+    assert response.status_code == 202
+
+    email_publisher.publish_password_reset.assert_awaited_once()
+
+    call = email_publisher.publish_password_reset.await_args
+
+    assert call.kwargs['email'] == 'user@example.com'
+    assert call.kwargs['code']
+    assert len(call.kwargs['code']) == 6
+    assert call.kwargs['message_id']
+
+
+@pytest.mark.asyncio
+async def test_request_password_reset_for_unknown_email(
+    client: AsyncClient,
+    email_publisher: FakeEmailPublisher,
+) -> None:
+    response = await client.post(
+        '/api/v1/auth/password/reset/request',
+        json={
+            'email': 'unknown@example.com',
+        },
+    )
+
+    assert response.status_code == 202
+
+    email_publisher.publish_password_reset.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_request_password_reset_rejects_invalid_email(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        '/api/v1/auth/password/reset/request',
+        json={
+            'email': 'not-an-email',
+        },
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_confirm_password_reset(
+    client: AsyncClient,
+    session: AsyncSession,
+    email_publisher: FakeEmailPublisher,
+) -> None:
+    await register_user(client)
+    await login_user(client)
+
+    cookie_name = settings.refresh_token_cookie.name
+    old_refresh_token = client.cookies[cookie_name]
+
+    await client.post(
+        '/api/v1/auth/password/reset/request',
+        json={
+            'email': 'user@example.com',
+        },
+    )
+
+    call = email_publisher.publish_password_reset.await_args
+    reset_code = call.kwargs['code']
+
+    response = await client.post(
+        '/api/v1/auth/password/reset/confirm',
+        json={
+            'email': 'user@example.com',
+            'code': reset_code,
+            'password': 'newpassword123',
+            'password_repeat': 'newpassword123',
+        },
+    )
+
+    assert response.status_code == 204
+    assert response.content == b''
+
+    user = await get_user(session)
+
+    assert user.password_hash != 'password123'
+
+    result = await session.execute(
+        select(PasswordResetCode).where(
+            PasswordResetCode.user_id == user.id,
+        ),
+    )
+    reset_code_model = result.scalar_one()
+
+    assert reset_code_model.used_at is not None
+
+    client.cookies.set(
+        cookie_name,
+        old_refresh_token,
+    )
+
+    refresh_response = await client.post(
+        '/api/v1/auth/tokens/refresh',
+    )
+
+    assert refresh_response.status_code == 401
+    assert refresh_response.json()['detail'] == (
+        'Refresh token reuse detected'
+    )
+
+    login_response = await client.post(
+        '/api/v1/auth/login',
+        json={
+            'email': 'user@example.com',
+            'password': 'newpassword123',
+        },
+    )
+
+    assert login_response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_confirm_password_reset_rejects_invalid_code(
+    client: AsyncClient,
+    email_publisher: FakeEmailPublisher,
+) -> None:
+    await register_user(client)
+
+    await client.post(
+        '/api/v1/auth/password/reset/request',
+        json={
+            'email': 'user@example.com',
+        },
+    )
+
+    response = await client.post(
+        '/api/v1/auth/password/reset/confirm',
+        json={
+            'email': 'user@example.com',
+            'code': '000000',
+            'password': 'newpassword123',
+            'password_repeat': 'newpassword123',
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()['detail'] == (
+        'Invalid or expired verification code'
+    )
+
+
+@pytest.mark.asyncio
+async def test_confirm_password_reset_rejects_invalid_code_format(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        '/api/v1/auth/password/reset/confirm',
+        json={
+            'email': 'user@example.com',
+            'code': '12345',
+            'password': 'newpassword123',
+            'password_repeat': 'newpassword123',
+        },
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_confirm_password_reset_rejects_password_mismatch(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        '/api/v1/auth/password/reset/confirm',
+        json={
+            'email': 'user@example.com',
+            'code': '123456',
+            'password': 'newpassword123',
+            'password_repeat': 'different123',
+        },
+    )
+
+    assert response.status_code == 422

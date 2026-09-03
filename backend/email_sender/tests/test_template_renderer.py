@@ -104,3 +104,16 @@ def test_render_raises_when_template_does_not_exist(
 
     with pytest.raises(TemplateNotFound):
         renderer.render('missing.html')
+
+
+def test_render_password_reset_template(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    renderer = TemplateRenderer()
+
+    result = renderer.render(
+        'password_reset.html',
+        code='123456',
+    )
+
+    assert '123456' in result

@@ -51,3 +51,25 @@ class UserResponse(BaseModel):
 
 class EmailApprovalRequest(BaseModel):
     code: str = Field(min_length=6, max_length=6, pattern=r'^\d{6}$')
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    email: EmailStr
+    code: str = Field(
+        min_length=6,
+        max_length=6,
+        pattern=r'^\d{6}$',
+    )
+    password: str = Field(min_length=8, max_length=128)
+    password_repeat: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode='after')
+    def password_match(self) -> Self:
+        if self.password != self.password_repeat:
+            raise ValueError('Passwords do not match')
+
+        return self

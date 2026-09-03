@@ -35,6 +35,8 @@ class BaseVerificationCode(Base):
 
 
 class EmailVerificationCode(BaseVerificationCode):
-    """Email verification code model."""
-
     __tablename__ = 'email_verification_codes'
+
+
+class PasswordResetCode(BaseVerificationCode):
+    __tablename__ = 'password_reset_codes'

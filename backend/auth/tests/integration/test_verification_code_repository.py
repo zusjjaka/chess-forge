@@ -8,8 +8,19 @@ from datetime import (
 import pytest
 
 from models.user import User
-from models.verification_code import EmailVerificationCode
-from repositories.verification_code import EmailVerificationCodeRepository
+from models.verification_code import (
+    EmailVerificationCode,
+    PasswordResetCode,
+)
+from repositories.verification_code import (
+    EmailVerificationCodeRepository,
+    PasswordResetCodeRepository,
+)
+
+
+@pytest.fixture
+def password_reset_repository(session) -> PasswordResetCodeRepository:
+    return PasswordResetCodeRepository(session=session)
 
 
 @pytest.fixture
@@ -212,3 +223,39 @@ async def test_mark_as_used_does_not_overwrite_used_code(
     await repository.session.refresh(verification_code)
 
     assert verification_code.used_at == original_used_at
+
+
+@pytest.mark.asyncio
+async def test_password_reset_repository(
+    password_reset_repository: PasswordResetCodeRepository,
+    user: User,
+) -> None:
+    code_hash = b'a' * 32
+    expires_at = datetime.now(UTC) + timedelta(minutes=15)
+
+    reset_code = await password_reset_repository.create(
+        user_id=user.id,
+        code_hash=code_hash,
+        expires_at=expires_at,
+    )
+
+    assert isinstance(reset_code, PasswordResetCode)
+    assert reset_code.user_id == user.id
+    assert reset_code.code_hash == code_hash
+    assert reset_code.expires_at == expires_at
+    assert reset_code.used_at is None
+
+    result = await password_reset_repository.get_valid_by_user_id(
+        user_id=user.id,
+        code_hash=code_hash,
+    )
+
+    assert result is reset_code
+
+    await password_reset_repository.mark_as_used(
+        reset_code.id,
+    )
+
+    await password_reset_repository.session.refresh(reset_code)
+
+    assert reset_code.used_at is not None

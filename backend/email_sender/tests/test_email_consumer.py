@@ -86,6 +86,44 @@ async def test_handle_verification_email(
 
 
 @pytest.mark.asyncio
+@patch('consumers.email.EmailSender')
+@patch('consumers.email.TemplateRenderer')
+async def test_handle_password_reset_email(
+    renderer_class: MagicMock,
+    sender_class: MagicMock,
+) -> None:
+    renderer = MagicMock()
+    renderer.render.return_value = '<h1>Password Reset</h1>'
+    renderer_class.return_value = renderer
+
+    sender = MagicMock()
+    sender_class.return_value = sender
+
+    message = make_message(
+        message_type='email.password_reset',
+        data={
+            'code': '654321',
+        },
+    )
+
+    await handle_message(message)
+
+    renderer.render.assert_called_once_with(
+        template_name='password_reset.html',
+        code='654321',
+    )
+
+    sender.send.assert_called_once_with(
+        to='user@example.com',
+        subject='ChessForge - Password Reset',
+        body='<h1>Password Reset</h1>',
+    )
+
+    message.process_context.__aenter__.assert_awaited_once()
+    message.process_context.__aexit__.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_handle_message_rejects_invalid_json() -> None:
     message = FakeMessage(
         b'not valid json',

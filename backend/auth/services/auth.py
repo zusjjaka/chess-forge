@@ -19,7 +19,10 @@ from models.user import User
 from publishers.email import EmailPublisher
 from repositories.refresh_token import RefreshTokenRepository
 from repositories.user import UserRepository
-from repositories.verification_code import EmailVerificationCodeRepository
+from repositories.verification_code import (
+    EmailVerificationCodeRepository,
+    PasswordResetCodeRepository,
+)
 from utils.security import (
     hash_password,
     hash_secret,
@@ -38,7 +41,8 @@ class AuthService:
     def __init__(self, session: AsyncSession, email_publisher: EmailPublisher) -> None:
         self.users = UserRepository(session)
         self.refresh_tokens = RefreshTokenRepository(session)
-        self.codes = EmailVerificationCodeRepository(session=session)
+        self.email_codes = EmailVerificationCodeRepository(session=session)
+        self.passw_codes = PasswordResetCodeRepository(session=session)
         self.email_publisher = email_publisher
         self.session = session
 
@@ -62,7 +66,7 @@ class AuthService:
                 password_hash=password_hash,
             )
 
-        verification_code = await self.codes.create(
+        verification_code = await self.email_codes.create(
             user_id=user.id,
             code_hash=hash_secret(code),
             expires_at=now + settings.verification_code_lifetime,
@@ -172,3 +176,29 @@ class AuthService:
     async def logout_all(self, user_id: uuid.UUID) -> None:
         await self.refresh_tokens.revoke_all_for_user(user_id)
         await self.session.commit()
+
+    async def request_password_reset(self,
+                                     email: str
+                                     ) -> None:
+        user = await self.users.get_by_email(email)
+
+        if user is None:
+            return
+
+        code = generate_verification_code()
+        code_hash = hash_secret(code)
+        now = datetime.now(UTC)
+
+        reset_code = await self.passw_codes.create(
+            user_id=user.id,
+            code_hash=code_hash,
+            expires_at=now + settings.verification_code_lifetime
+        )
+
+        await self.session.commit()
+
+        await self.email_publisher.publish_password_reset(
+            email=user.email,
+            code=code,
+            message_id=reset_code.id
+        )

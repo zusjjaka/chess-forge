@@ -12,6 +12,10 @@ EMAIL_TYPES: dict[str, tuple[str, str]] = {
     'email.verification': (
         'email_verification.html',
         'ChessForge - Email Verification',
+    ),
+    'email.password_reset': (
+        'password_reset.html',
+        'ChessForge - Password Reset',
     )
 }
 

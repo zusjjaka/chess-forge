@@ -184,12 +184,6 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 **Output — `202 Accepted`**
 
-```json
-{
-  "status": "email_sent"
-}
-```
-
 Сервис отправляет на почту код для подтверждения.
 
 ---
@@ -202,6 +196,7 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 ```json
 {
+  "email": "user@example.com",
   "code": "123456",
   "password": "string",
   "password_repeat": "string"
@@ -262,12 +257,6 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 ```
 
 **Output — `202 Accepted`**
-
-```json
-{
-  "status": "verification_sent"
-}
-```
 
 Письмо с кодом подтверждения отправлено на почту.
 
