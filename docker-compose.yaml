@@ -19,7 +19,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - auth_postgres_data:/var/lib/postgresql
+      - auth_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER} -d ${AUTH_DB_NAME}"]
       interval: 5s
@@ -41,7 +41,7 @@ services:
       timeout: 5s
       retries: 5
 
-  celery_worker:
+  email_sender:
     build:
       context: "./backend/email_sender"
     env_file:

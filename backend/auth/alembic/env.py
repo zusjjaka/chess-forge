@@ -1,10 +1,18 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import (
+    engine_from_config,
+    pool,
+)
 
 from alembic import context
 from core.config import get_settings
 from db.base import Base
+from models.refresh_token import RefreshToken  # ruff: ignore[unused-import]
+from models.user import User  # ruff: ignore[unused-import]
+from models.verification_code import (
+    EmailVerificationCode,  # ruff: ignore[unused-import]
+)
 
 config = context.config
 
@@ -16,7 +24,7 @@ target_metadata = Base.metadata
 
 
 def get_sync_database_url() -> str:
-    return settings.database_url.replace('asyncpg', 'psycopg')
+    return settings.database.url.replace('asyncpg', 'psycopg')
 
 
 def run_migrations_offline() -> None:

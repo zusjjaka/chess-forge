@@ -4,10 +4,6 @@
 
 Celery выбран для выполнения фоновых задач.
 
-Первое предназначение - отправка email:
-
-Registration - API - RabbitMQ - Celery Worker - Email Service
-
 Основные причины:
 
 - выполнение задач вне client <-> http <-> server цикла;

@@ -1,9 +1,12 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import (
     BaseSettings,
     SettingsConfigDict,
 )
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
@@ -13,7 +16,9 @@ class Settings(BaseSettings):
     smtp_password: str
     from_email: str
 
-    celery_broker_url: str
+    broker_url: str
+
+    templates_dir: Path = BASE_DIR / 'templates'
 
     model_config = SettingsConfigDict(
         env_file='.env',

@@ -9,13 +9,6 @@ repos:
         types: [python]
         pass_filenames: false
 
-      - id: auth-ruff-format
-        name: Auth Ruff format
-        entry: uv run --directory backend/auth ruff format
-        language: system
-        types: [python]
-        pass_filenames: false
-
       - id: auth-ruff-check
         name: Auth Ruff check
         entry: uv run --directory backend/auth ruff check
@@ -27,19 +20,13 @@ repos:
         name: Auth Mypy
         entry: uv run --directory backend/auth mypy .
         language: system
+        types: [python]
         pass_filenames: false
 
       # Email Sender
       - id: email-sender-ruff-check-fix
         name: Email Sender Ruff check --fix
         entry: uv run --directory backend/email_sender ruff check --fix
-        language: system
-        types: [python]
-        pass_filenames: false
-
-      - id: email-sender-ruff-format
-        name: Email Sender Ruff format
-        entry: uv run --directory backend/email_sender ruff format
         language: system
         types: [python]
         pass_filenames: false
@@ -55,4 +42,5 @@ repos:
         name: Email Sender Mypy
         entry: uv run --directory backend/email_sender mypy .
         language: system
+        types: [python]
         pass_filenames: false

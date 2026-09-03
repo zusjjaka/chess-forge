@@ -23,6 +23,16 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      rabbitmq:
+        image: rabbitmq:4.2
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       DATABASE_URL: postgresql+asyncpg://auth_test:root@localhost:5432/auth_test
 
@@ -42,9 +52,7 @@ jobs:
 
       - name: Ruff
         working-directory: backend/auth
-        run: |
-          uv run ruff check
-          uv run ruff format --check
+        run: uv run ruff check
 
       - name: Mypy
         working-directory: backend/auth
@@ -75,6 +83,7 @@ jobs:
         uses: astral-sh/setup-uv@v6
 
       - name: Set up Python
+        working-directory: backend/email_sender
         run: uv python install 3.13
 
       - name: Install dependencies
@@ -83,9 +92,7 @@ jobs:
 
       - name: Ruff
         working-directory: backend/email_sender
-        run: |
-          uv run ruff check
-          uv run ruff format --check
+        run: uv run ruff check
 
       - name: Mypy
         working-directory: backend/email_sender

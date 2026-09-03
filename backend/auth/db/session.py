@@ -11,7 +11,7 @@ from core.config import get_settings
 
 settings = get_settings()
 
-engine: AsyncEngine = create_async_engine(url=settings.database_url, pool_pre_ping=True)
+engine: AsyncEngine = create_async_engine(url=settings.database.url, pool_pre_ping=True)
 
 AsyncSessionFactory = async_sessionmaker(bind=engine, expire_on_commit=False)
 

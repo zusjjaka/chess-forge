@@ -4,11 +4,11 @@ from datetime import UTC, datetime
 import jwt
 
 from core.jwt import PUBLIC_KEY
+from utils.security import hash_secret
 from utils.tokens import (
     create_access_token,
     decode_access_token,
     generate_refresh_token,
-    hash_refresh_token,
 )
 
 
@@ -74,27 +74,29 @@ class TestRefreshToken:
 
         assert first_token != second_token
 
-    def test_hash_refresh_token(self) -> None:
-        token = 'refresh-token'
 
-        token_hash = hash_refresh_token(token)
+class TestHashSecret:
+    def test_hash_secret_returns_sha256_hash(self) -> None:
+        secret = 'refresh-token'
 
-        assert isinstance(token_hash, bytes)
-        assert len(token_hash) == 32
+        secret_hash = hash_secret(secret)
 
-    def test_same_refresh_token_has_same_hash(self) -> None:
-        token = generate_refresh_token()
+        assert isinstance(secret_hash, bytes)
+        assert len(secret_hash) == 32
 
-        first_hash = hash_refresh_token(token)
-        second_hash = hash_refresh_token(token)
+    def test_same_secret_has_same_hash(self) -> None:
+        secret = generate_refresh_token()
+
+        first_hash = hash_secret(secret)
+        second_hash = hash_secret(secret)
 
         assert first_hash == second_hash
 
-    def test_different_refresh_tokens_have_different_hashes(self) -> None:
-        first_token = generate_refresh_token()
-        second_token = generate_refresh_token()
+    def test_different_secrets_have_different_hashes(self) -> None:
+        first_secret = generate_refresh_token()
+        second_secret = generate_refresh_token()
 
-        first_hash = hash_refresh_token(first_token)
-        second_hash = hash_refresh_token(second_token)
+        first_hash = hash_secret(first_secret)
+        second_hash = hash_secret(second_secret)
 
         assert first_hash != second_hash

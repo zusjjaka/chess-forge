@@ -59,7 +59,6 @@
 | `id`         | `uuid`        | Уникальный идентификатор кода.                                 |
 | `user_id`    | `uuid`        | Идентификатор пользователя.                                    |
 | `code_hash`  | `text`        | Хэш verification-кода.                                         |
-| `status`     | `enum`        | Статус кода: `active` или `used`.                              |
 | `expires_at` | `timestamptz` | Время истечения действия кода.                                 |
 | `used_at`    | `timestamptz` | Время использования кода. `NULL`, если код ещё не использован. |
 | `created_at` | `timestamptz` | Время создания кода.                                           |
@@ -73,7 +72,6 @@
 | `id`         | `uuid`         | Уникальный идентификатор кода.                                 |
 | `user_id`    | `uuid`         | Идентификатор пользователя.                                    |
 | `code_hash`  | `varchar(255)` | Хэш кода восстановления.                                       |
-| `status`     | `enum`         | Статус кода: `active` или `used`.                              |
 | `expires_at` | `timestamptz`  | Время истечения действия кода.                                 |
 | `used_at`    | `timestamptz`  | Время использования кода. `NULL`, если код ещё не использован. |
 | `created_at` | `timestamptz`  | Время создания кода.                                           |
@@ -88,7 +86,6 @@
 | `user_id`    | `uuid`         | Идентификатор пользователя.                                    |
 | `new_email`  | `varchar(254)` | Новый email, который пользователь хочет установить.            |
 | `code_hash`  | `text`         | Хэш кода подтверждения.                                        |
-| `status`     | `enum`         | Статус кода: `active` или `used`.                              |
 | `expires_at` | `timestamptz`  | Время истечения действия кода.                                 |
 | `used_at`    | `timestamptz`  | Время использования кода. `NULL`, если код ещё не использован. |
 | `created_at` | `timestamptz`  | Время создания кода.                                           |

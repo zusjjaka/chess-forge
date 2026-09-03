@@ -5,11 +5,15 @@ from fastapi import (
     Response,
     status,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import get_current_user
+from api.dependencies import (
+    get_auth_service,
+    get_current_user,
+    get_email_verification_service,
+    get_unverified_current_user,
+)
 from core.config import get_settings
-from db.session import get_db_session
+from exceptions import RefreshTokenInvalidError
 from models.user import User
 from schemas.auth import (
     LoginRequest,
@@ -18,7 +22,9 @@ from schemas.auth import (
     TokenResponse,
     UserResponse,
 )
+from schemas.email import EmailVerificationData
 from services.auth import AuthService
+from services.verification_code import EmailVerificationService
 
 router = APIRouter(prefix='/auth', tags=['Authentication'])
 
@@ -31,10 +37,8 @@ settings = get_settings()
     status_code=status.HTTP_201_CREATED,
 )
 async def register(
-    data: RegisterRequest, session: AsyncSession = Depends(get_db_session)
+    data: RegisterRequest, service: AuthService = Depends(get_auth_service)
 ) -> RegisterResponse:
-    service = AuthService(session)
-
     user = await service.register(
         email=data.email,
         password=data.password,
@@ -55,10 +59,8 @@ async def login(
     data: LoginRequest,
     request: Request,
     response: Response,
-    session: AsyncSession = Depends(get_db_session),
+    service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
-    service = AuthService(session)
-
     access_token, refresh_token = await service.login(
         email=data.email,
         password=data.password,
@@ -77,7 +79,7 @@ async def login(
 
     return TokenResponse(
         access_token=access_token,
-        expires_in=settings.access_token_expire_seconds,
+        expires_in=int(settings.access_token_lifetime.total_seconds()),
     )
 
 
@@ -88,19 +90,12 @@ async def login(
 async def refresh(
     request: Request,
     response: Response,
-    session: AsyncSession = Depends(get_db_session),
+    service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
     refresh_token = request.cookies.get(settings.refresh_token_cookie.name)
 
     if refresh_token is None:
-        from fastapi import HTTPException
-
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='Refresh token missing',
-        )
-
-    service = AuthService(session)
+        raise RefreshTokenInvalidError
 
     access_token, new_refresh_token = await service.refresh(
         refresh_token=refresh_token,
@@ -121,20 +116,22 @@ async def refresh(
 
     return TokenResponse(
         access_token=access_token,
-        expires_in=settings.access_token_expire_seconds,
+        expires_in=int(settings.access_token_lifetime.total_seconds()),
     )
 
 
-@router.post('/logout', status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    '/logout',
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def logout(
     request: Request,
     response: Response,
-    session: AsyncSession = Depends(get_db_session),
+    service: AuthService = Depends(get_auth_service),
 ) -> None:
     refresh_token = request.cookies.get(settings.refresh_token_cookie.name)
 
     if refresh_token is not None:
-        service = AuthService(session)
         await service.logout(refresh_token)
 
     response.delete_cookie(
@@ -149,10 +146,8 @@ async def logout(
 )
 async def logout_all(
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_db_session),
+    service: AuthService = Depends(get_auth_service),
 ) -> None:
-    service = AuthService(session)
-
     await service.logout_all(current_user.id)
 
 
@@ -162,3 +157,15 @@ async def logout_all(
 )
 async def me(current_user: User = Depends(get_current_user)) -> UserResponse:
     return UserResponse.model_validate(current_user)
+
+
+@router.post(
+    '/email/approval',
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def approve_email(
+    data: EmailVerificationData,
+    current_user: User = Depends(get_unverified_current_user),
+    service: EmailVerificationService = Depends(get_email_verification_service),
+) -> None:
+    await service.verify(user_id=current_user.id, code=data.code)

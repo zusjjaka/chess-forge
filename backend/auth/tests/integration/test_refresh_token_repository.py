@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.refresh_token import RefreshToken
 from models.user import User
-from repositories.refresh_tokens import RefreshTokenRepository
-from repositories.users import UserRepository
+from repositories.refresh_token import RefreshTokenRepository
+from repositories.user import UserRepository
 
 
 @pytest.mark.asyncio

@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from repositories.users import UserRepository
+from repositories.user import UserRepository
 
 
 @pytest.mark.asyncio

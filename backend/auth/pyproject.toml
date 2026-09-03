@@ -15,6 +15,7 @@ dependencies = [
     "sqlalchemy>=2.0.52",
     "psycopg[binary]>=3.3.4",
     "mypy>=2.3.1",
+    "aio-pika>=10.0.1",
 ]
 
 [dependency-groups]

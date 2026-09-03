@@ -9,4 +9,4 @@ RUN pip install uv \
 
 COPY . .
 
-CMD ["uv", "run", "celery", "-A", "core.celery:celery_app", "worker", "--loglevel=INFO"]
+CMD ["uv", "run", "python", "main.py"]

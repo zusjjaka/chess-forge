@@ -30,13 +30,13 @@
 │   ├── <a href="#post-apiv1authlogout">logout</a>
 │   ├── <a href="#post-apiv1authlogout-all">logout-all</a>
 │   ├── tokens/
-│   │   ├── <a href="#post-apiv1authtokensapproval">approval</a>
 │   │   └── <a href="#post-apiv1authtokensrefresh">refresh</a>
 │   ├── password/
 │   │   ├── <a href="#post-apiv1authpasswordresetrequest">reset/request</a>
 │   │   ├── <a href="#post-apiv1authpasswordresetconfirm">reset/confirm</a>
 │   │   └── <a href="#post-apiv1authpasswordchange">change</a>
 │   ├── email/
+│   │   ├── <a href="#post-apiv1authemailapproval">approval</a>
 │   │   ├── <a href="#post-apiv1authemailchange">change</a>
 │   │   └── <a href="#post-apiv1authemailchangeconfirm">change/confirm</a>
 │   └── <a href="#get-apiv1authme">me</a>
@@ -148,28 +148,6 @@ Refresh token передается серверу через HttpOnly, Secure, S
 
 ---
 
-### `POST /api/v1/auth/tokens/approval`
-
-Подтверждение почты через отправленный код
-
-**Input**
-
-```json
-{
-  "code": "123456"
-}
-```
-
-**Output — `200 OK`**
-
-```json
-{
-  "status": "approved"
-}
-```
-
----
-
 ### `POST /api/v1/auth/tokens/refresh`
 
 Запрашивает новую пару токенов.
@@ -253,6 +231,22 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 ---
 
 ## Email
+
+### `POST /api/v1/auth/email/approval`
+
+Подтверждение почты через отправленный код
+
+**Input**
+
+```json
+{
+  "code": "123456"
+}
+```
+
+**Output — `204 No Content`**
+
+---
 
 ### `POST /api/v1/auth/email/change`
 
@@ -934,23 +928,3 @@ HTTP-Метод не существует для данного endpoint.
 ### `500 Internal Server Error`
 
 Неожиданная ошибка на стороне сервера.
-
----
-
-# Custom Exceptions
-
-## `UserAlreadyExistError`
-
-Возникает при попытке зарегистрировать пользователя с email, который уже зарегистрирован в системе.
-
-Используется для обработки конфликта уникальности пользователя.
-
-**HTTP Response — `409 Conflict`**
-
----
-
-## `InvalidAccessTokenError`
-
-Возникает, когда переданный access token отсутствует, имеет некорректную структуру, не прошел проверку подписи, истёк или содержит недопустимые данные.
-
-**HTTP Response — `401 Unauthorized`**

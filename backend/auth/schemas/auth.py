@@ -44,8 +44,10 @@ class TokenResponse(BaseModel):
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: uuid.UUID
     email: EmailStr
     display_name: str | None
-    is_email_verified: bool
     created_at: datetime
+
+
+class EmailApprovalRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6, pattern=r'^\d{6}$')

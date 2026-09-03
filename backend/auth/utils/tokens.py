@@ -1,10 +1,8 @@
-import hashlib
 import secrets
 import uuid
 from datetime import (
     UTC,
     datetime,
-    timedelta,
 )
 from typing import Any
 
@@ -21,7 +19,7 @@ settings = get_settings()
 
 def create_access_token(user_id: uuid.UUID) -> str:
     now = datetime.now(UTC)
-    expires_at = now + timedelta(seconds=settings.access_token_expire_seconds)
+    expires_at = now + settings.access_token_lifetime
 
     payload = {
         'sub': str(user_id),
@@ -49,5 +47,6 @@ def generate_refresh_token() -> str:
     return secrets.token_urlsafe(64)
 
 
-def hash_refresh_token(token: str) -> bytes:
-    return hashlib.sha256(token.encode()).digest()
+def generate_verification_code() -> str:
+    secret_code: int = secrets.randbelow(1_000_000)
+    return f'{secret_code:06d}'

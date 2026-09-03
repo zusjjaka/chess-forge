@@ -1,33 +1,24 @@
 import smtplib
 from email.message import EmailMessage
 
-from core.config import Settings
+from core.config import get_settings
+
+settings = get_settings()
 
 
 class EmailSender:
-    def __init__(self, settings: Settings) -> None:
-        self._settings = settings
-
     def send(self, *, to: str, subject: str, body: str) -> None:
         message = EmailMessage()
 
-        message['From'] = self._settings.from_email
+        message['From'] = settings.from_email
         message['To'] = to
         message['Subject'] = subject
 
-        message.set_content(body)
+        message.add_alternative(body, subtype='html')
 
-        smtp_config = (
-            self._settings.smtp_host,
-            self._settings.smtp_port,
-        )
-
-        with smtplib.SMTP(*smtp_config) as smtp:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as smtp:
             smtp.starttls()
 
-            smtp.login(
-                self._settings.smtp_username,
-                self._settings.smtp_password,
-            )
+            smtp.login(settings.smtp_username, settings.smtp_password)
 
             smtp.send_message(message)
