@@ -71,6 +71,9 @@ jobs:
 
       - name: Pytest
         working-directory: backend/auth
+        env:
+          DATABASE__URL: postgresql+psycopg://auth_test:root@localhost:5432/auth_test
+          RABBITMQ__URL: amqp://guest:guest@localhost:5672//
         run: uv run pytest
 
   quality-email-sender:
