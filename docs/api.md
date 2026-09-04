@@ -286,11 +286,19 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 **Input**
 
+Нет.
+
 **Output — `200 OK`**
 
 ```json
 {
   "email": "user@example.com",
+  "display_name": "string",
+  "gender": "M",
+  "country": "KZ",
+  "birth_date": "2000-01-01",
+  "bio": "string",
+  "telegram_alias": "username",
   "created_at": "2026-01-01T12:00:00Z"
 }
 ```
@@ -311,12 +319,35 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 Все поля опциональные.
 
+Ограничения:
+
+- display_name - от 1 до 25 символов.
+
+- gender - M или F.
+
+- country - двухбуквенный код страны в формате ISO 3166-1 alpha-2.
+
+- birth_date - дата рождения; допускается возраст примерно от 6 до 100 лет.
+
+- bio - от 1 до 75 символов.
+
+- telegram_alias - от 5 до 32 символов, начинается с буквы и содержит только латинские буквы, цифры и _.
+
+- null можно передать для очистки значения.
+
+- Если поле не передано, его значение не изменяется.
+
 **Output — `200 OK`**
 
 ```json
 {
   "email": "user@example.com",
   "display_name": "string",
+  "gender": "M",
+  "country": "KZ",
+  "birth_date": "2000-01-01",
+  "bio": "string",
+  "telegram_alias": "username",
   "created_at": "2026-01-01T12:00:00Z"
 }
 ```

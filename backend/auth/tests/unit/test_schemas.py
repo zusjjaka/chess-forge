@@ -1,9 +1,15 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import (
+    UTC,
+    datetime,
+    date,
+    timedelta,
+)
 
 import pytest
 from pydantic import ValidationError
 
+from models.user import Gender
 from schemas.auth import (
     EmailApprovalRequest,
     EmailChangeConfirm,
@@ -15,6 +21,8 @@ from schemas.auth import (
     RegisterResponse,
     TokenResponse,
     UserResponse,
+    UserUpdateRequest,
+    UserUpdateResponse,
 )
 from schemas.email import (
     EmailMessage,
@@ -161,27 +169,52 @@ class TestUserResponse:
         data = UserResponse(
             email='user@example.com',
             display_name='Test User',
+            gender=Gender.MALE,
+            country='KZ',
+            birth_date=date(2000, 1, 1),
+            bio='Test bio',
+            telegram_alias='test_user',
             created_at=created_at,
         )
 
         assert data.email == 'user@example.com'
         assert data.display_name == 'Test User'
+        assert data.gender == Gender.MALE
+        assert data.country == 'KZ'
+        assert data.birth_date == date(2000, 1, 1)
+        assert data.bio == 'Test bio'
+        assert data.telegram_alias == 'test_user'
         assert data.created_at == created_at
 
-    def test_nullable_display_name(self) -> None:
+    def test_nullable_fields(self) -> None:
         data = UserResponse(
             email='user@example.com',
             display_name=None,
+            gender=None,
+            country=None,
+            birth_date=None,
+            bio=None,
+            telegram_alias=None,
             created_at=datetime.now(UTC),
         )
 
         assert data.display_name is None
+        assert data.gender is None
+        assert data.country is None
+        assert data.birth_date is None
+        assert data.bio is None
+        assert data.telegram_alias is None
 
     def test_invalid_email(self) -> None:
         with pytest.raises(ValidationError):
             UserResponse(
                 email='not-an-email',
                 display_name='Test User',
+                gender=Gender.MALE,
+                country='KZ',
+                birth_date=date(2000, 1, 1),
+                bio='Test bio',
+                telegram_alias='test_user',
                 created_at=datetime.now(UTC),
             )
 
@@ -189,6 +222,11 @@ class TestUserResponse:
         class UserModel:
             email = 'user@example.com'
             display_name = 'Test User'
+            gender = Gender.MALE
+            country = 'KZ'
+            birth_date = date(2000, 1, 1)
+            bio = 'Test bio'
+            telegram_alias = 'test_user'
             created_at = datetime.now(UTC)
 
         data = UserResponse.model_validate(
@@ -198,7 +236,208 @@ class TestUserResponse:
 
         assert data.email == UserModel.email
         assert data.display_name == UserModel.display_name
+        assert data.gender == UserModel.gender
+        assert data.country == UserModel.country
+        assert data.birth_date == UserModel.birth_date
+        assert data.bio == UserModel.bio
+        assert data.telegram_alias == UserModel.telegram_alias
         assert data.created_at == UserModel.created_at
+
+
+class TestUserUpdateRequest:
+    def test_valid_data(self) -> None:
+        data = UserUpdateRequest(
+            display_name='Test User',
+            gender=Gender.MALE,
+            country='KZ',
+            birth_date=date.today() - timedelta(days=365 * 20),
+            bio='Test bio',
+            telegram_alias='test_user',
+        )
+
+        assert data.display_name == 'Test User'
+        assert data.gender == Gender.MALE
+        assert data.country == 'KZ'
+        assert data.bio == 'Test bio'
+        assert data.telegram_alias == 'test_user'
+
+    def test_all_fields_are_optional(self) -> None:
+        data = UserUpdateRequest()
+
+        assert data.display_name is None
+        assert data.gender is None
+        assert data.country is None
+        assert data.birth_date is None
+        assert data.bio is None
+        assert data.telegram_alias is None
+
+    def test_nullable_fields(self) -> None:
+        data = UserUpdateRequest(
+            display_name=None,
+            gender=None,
+            country=None,
+            birth_date=None,
+            bio=None,
+            telegram_alias=None,
+        )
+
+        assert data.display_name is None
+        assert data.gender is None
+        assert data.country is None
+        assert data.birth_date is None
+        assert data.bio is None
+        assert data.telegram_alias is None
+
+    def test_display_name_too_long(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(display_name='a' * 26)
+
+    def test_empty_display_name(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(display_name='')
+
+    def test_invalid_gender(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(gender='X')
+
+    def test_country_too_short(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(country='K')
+
+    def test_country_too_long(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(country='KAZ')
+
+    def test_country_must_contain_uppercase_letters(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(country='kz')
+
+    def test_country_must_contain_only_letters(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(country='12')
+
+    def test_bio_too_long(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(bio='a' * 76)
+
+    def test_empty_bio(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(bio='')
+
+    def test_telegram_alias_too_short(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(telegram_alias='test')
+
+    def test_telegram_alias_too_long(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(telegram_alias='a' * 33)
+
+    def test_telegram_alias_must_start_with_letter(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(telegram_alias='1test_user')
+
+    def test_telegram_alias_invalid_characters(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(telegram_alias='test-user')
+
+    def test_birth_date_too_recent(self) -> None:
+        birthday = date.today() - timedelta(days=365 * 5)
+
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(birth_date=birthday)
+
+    def test_birth_date_too_old(self) -> None:
+        birthday = date.today() - timedelta(days=365 * 101)
+
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(birth_date=birthday)
+
+    def test_birth_date_valid(self) -> None:
+        birthday = date.today() - timedelta(days=365 * 20)
+
+        data = UserUpdateRequest(birth_date=birthday)
+
+        assert data.birth_date == birthday
+
+    def test_birth_date_in_future(self) -> None:
+        birthday = date.today() + timedelta(days=1)
+
+        with pytest.raises(ValidationError):
+            UserUpdateRequest(birth_date=birthday)
+
+
+class TestUserUpdateResponse:
+    def test_valid_data(self) -> None:
+        data = UserUpdateResponse(
+            email='user@example.com',
+            display_name='Test User',
+            gender=Gender.MALE,
+            country='KZ',
+            birth_date=date(2000, 1, 1),
+            bio='Test bio',
+            telegram_alias='test_user',
+        )
+
+        assert data.email == 'user@example.com'
+        assert data.display_name == 'Test User'
+        assert data.gender == Gender.MALE
+        assert data.country == 'KZ'
+        assert data.birth_date == date(2000, 1, 1)
+        assert data.bio == 'Test bio'
+        assert data.telegram_alias == 'test_user'
+
+    def test_nullable_fields(self) -> None:
+        data = UserUpdateResponse(
+            email='user@example.com',
+            display_name=None,
+            gender=None,
+            country=None,
+            birth_date=None,
+            bio=None,
+            telegram_alias=None,
+        )
+
+        assert data.display_name is None
+        assert data.gender is None
+        assert data.country is None
+        assert data.birth_date is None
+        assert data.bio is None
+        assert data.telegram_alias is None
+
+    def test_invalid_email(self) -> None:
+        with pytest.raises(ValidationError):
+            UserUpdateResponse(
+                email='not-an-email',
+                display_name='Test User',
+                gender=Gender.MALE,
+                country='KZ',
+                birth_date=date(2000, 1, 1),
+                bio='Test bio',
+                telegram_alias='test_user',
+            )
+
+    def test_from_attributes(self) -> None:
+        class UserModel:
+            email = 'user@example.com'
+            display_name = 'Test User'
+            gender = Gender.MALE
+            country = 'KZ'
+            birth_date = date(2000, 1, 1)
+            bio = 'Test bio'
+            telegram_alias = 'test_user'
+
+        data = UserUpdateResponse.model_validate(
+            UserModel(),
+            from_attributes=True,
+        )
+
+        assert data.email == UserModel.email
+        assert data.display_name == UserModel.display_name
+        assert data.gender == UserModel.gender
+        assert data.country == UserModel.country
+        assert data.birth_date == UserModel.birth_date
+        assert data.bio == UserModel.bio
+        assert data.telegram_alias == UserModel.telegram_alias
 
 
 class TestEmailApprovalRequest:

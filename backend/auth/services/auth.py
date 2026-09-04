@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.config import get_settings
 from exceptions import (
     EmailSameError,
+    InvalidAccessTokenError,
     InvalidCredentialsError,
     PasswordInvalidError,
     RefreshTokenExpiredError,
@@ -264,3 +265,22 @@ class AuthService:
             code=code,
             message_id=email_change_code.id,
         )
+
+    async def update_user(
+        self,
+        user_id: uuid.UUID,
+        data: dict[str, object],
+    ) -> User:
+        user = await self.users.get_by_id(user_id)
+
+        if user is None:
+            raise InvalidAccessTokenError
+
+        await self.users.update(
+            user=user,
+            data=data,
+        )
+
+        await self.session.commit()
+
+        return user

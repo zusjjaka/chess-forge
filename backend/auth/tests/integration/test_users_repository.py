@@ -112,3 +112,40 @@ async def test_create_user_defaults(session: AsyncSession) -> None:
 
     assert user.is_email_verified is False
     assert user.created_at is not None
+
+
+@pytest.mark.asyncio
+async def test_update_user(session: AsyncSession) -> None:
+    repository = UserRepository(session)
+
+    user = await repository.create(
+        email='user@example.com',
+        password_hash='hashed-password',
+    )
+
+    await session.commit()
+
+    data = {
+        'display_name': 'Updated User',
+        'country': 'KZ',
+        'bio': 'Updated bio',
+    }
+
+    result = await repository.update(
+        user=user,
+        data=data,
+    )
+
+    await session.commit()
+
+    assert result is user
+    assert user.display_name == 'Updated User'
+    assert user.country == 'KZ'
+    assert user.bio == 'Updated bio'
+
+    refreshed_user = await repository.get_by_id(user.id)
+
+    assert refreshed_user is not None
+    assert refreshed_user.display_name == 'Updated User'
+    assert refreshed_user.country == 'KZ'
+    assert refreshed_user.bio == 'Updated bio'

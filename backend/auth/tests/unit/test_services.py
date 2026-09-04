@@ -6,6 +6,7 @@ import pytest
 
 from exceptions import (
     EmailSameError,
+    InvalidAccessTokenError,
     InvalidCredentialsError,
     PasswordInvalidError,
     RefreshTokenExpiredError,
@@ -1702,3 +1703,83 @@ async def test_confirm_email_change_user_not_found(
 
     email_change_service.session.commit.assert_not_awaited()
     mark_as_used.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_user(
+    service: AuthService,
+    user: User,
+) -> None:
+    data = {
+        'display_name': 'New Name',
+        'gender': 'M',
+        'country': 'KZ',
+        'birth_date': datetime.now(UTC).date(),
+        'bio': 'New bio',
+        'telegram_alias': 'new_user',
+    }
+
+    with (
+        patch.object(
+            service.users,
+            'get_by_id',
+            new_callable=AsyncMock,
+            return_value=user,
+        ) as get_user,
+        patch.object(
+            service.users,
+            'update',
+            new_callable=AsyncMock,
+            return_value=user,
+        ) as update_user,
+    ):
+        result = await service.update_user(
+            user_id=user.id,
+            data=data,
+        )
+
+    assert result is user
+
+    get_user.assert_awaited_once_with(user.id)
+
+    update_user.assert_awaited_once_with(
+        user=user,
+        data=data,
+    )
+
+    service.session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_update_user_user_not_found(
+    service: AuthService,
+) -> None:
+    user_id = uuid4()
+    data = {
+        'display_name': 'New Name',
+    }
+
+    with (
+        patch.object(
+            service.users,
+            'get_by_id',
+            new_callable=AsyncMock,
+            return_value=None,
+        ) as get_user,
+        patch.object(
+            service.users,
+            'update',
+            new_callable=AsyncMock,
+        ) as update_user,
+        pytest.raises(InvalidAccessTokenError),
+    ):
+        await service.update_user(
+            user_id=user_id,
+            data=data,
+        )
+
+    get_user.assert_awaited_once_with(user_id)
+
+    update_user.assert_not_awaited()
+
+    service.session.commit.assert_not_awaited()

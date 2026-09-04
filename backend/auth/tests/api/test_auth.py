@@ -1,5 +1,10 @@
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime, timedelta
+from datetime import (
+    UTC,
+    datetime,
+    timedelta,
+    date,
+)
 from unittest.mock import AsyncMock
 
 import pytest
@@ -16,7 +21,10 @@ from api.dependencies import (
 from core.config import get_settings
 from main import app
 from models.refresh_token import RefreshToken
-from models.user import User
+from models.user import (
+    User,
+    Gender,
+)
 from models.verification_code import (
     EmailVerificationCode,
     PasswordResetCode,
@@ -754,44 +762,293 @@ async def test_me(
     client: AsyncClient,
     session: AsyncSession,
 ) -> None:
-    user = User(
-        email='user@example.com',
-        password_hash='hashed-password',
-        display_name=None,
-        is_email_verified=True,
+    await register_user(client)
+
+    user = await get_user(session)
+
+    user.is_email_verified = True
+    user.gender = Gender.MALE
+    user.country = 'KZ'
+    user.birth_date = date(2000, 1, 1)
+    user.bio = 'Test bio'
+    user.telegram_alias = 'test_user'
+
+    await session.commit()
+
+    login_data = await login_user(client)
+
+    response = await client.get(
+        '/api/v1/auth/me',
+        headers={
+            'Authorization': f"Bearer {login_data['access_token']}",
+        },
     )
 
-    session.add(user)
-    await session.flush()
+    assert response.status_code == 200
 
-    def override_get_current_user() -> User:
-        return user
+    data = response.json()
 
-    app.dependency_overrides[get_current_user] = override_get_current_user
+    assert data['email'] == user.email
+    assert data['display_name'] == user.display_name
+    assert data['gender'] == 'M'
+    assert data['country'] == 'KZ'
+    assert data['birth_date'] == '2000-01-01'
+    assert data['bio'] == 'Test bio'
+    assert data['telegram_alias'] == 'test_user'
+    assert data['created_at']
 
-    try:
-        response = await client.get(
-            '/api/v1/auth/me',
-        )
+    assert set(data) == {
+        'email',
+        'display_name',
+        'gender',
+        'country',
+        'birth_date',
+        'bio',
+        'telegram_alias',
+        'created_at',
+    }
 
-        assert response.status_code == 200
 
-        data = response.json()
+@pytest.mark.asyncio
+async def test_me_with_nullable_fields(
+    client: AsyncClient,
+    session: AsyncSession,
+) -> None:
+    await register_user(client)
 
-        assert data['email'] == user.email
-        assert data['display_name'] is None
-        assert 'created_at' in data
+    user = await get_user(session)
 
-        assert set(data) == {
-            'email',
-            'display_name',
-            'created_at',
-        }
-    finally:
-        app.dependency_overrides.pop(
-            get_current_user,
-            None,
-        )
+    user.is_email_verified = True
+
+    await session.commit()
+
+    login_data = await login_user(client)
+
+    response = await client.get(
+        '/api/v1/auth/me',
+        headers={
+            'Authorization': f"Bearer {login_data['access_token']}",
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data['display_name'] is None
+    assert data['gender'] is None
+    assert data['country'] is None
+    assert data['birth_date'] is None
+    assert data['bio'] is None
+    assert data['telegram_alias'] is None
+
+
+# ============================================================================
+# PATCH /api/v1/auth/me
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_update_me(
+    client: AsyncClient,
+    session: AsyncSession,
+) -> None:
+    await register_user(client)
+
+    user = await get_user(session)
+
+    user.is_email_verified = True
+
+    await session.commit()
+
+    login_data = await login_user(client)
+
+    response = await client.patch(
+        '/api/v1/auth/me',
+        headers={
+            'Authorization': f"Bearer {login_data['access_token']}",
+        },
+        json={
+            'display_name': 'Updated User',
+            'gender': 'M',
+            'country': 'KZ',
+            'birth_date': '2000-01-01',
+            'bio': 'Updated bio',
+            'telegram_alias': 'updated_user',
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data == {
+        'email': user.email,
+        'display_name': 'Updated User',
+        'gender': 'M',
+        'country': 'KZ',
+        'birth_date': '2000-01-01',
+        'bio': 'Updated bio',
+        'telegram_alias': 'updated_user',
+    }
+
+    await session.refresh(user)
+
+    assert user.display_name == 'Updated User'
+    assert user.gender == Gender.MALE
+    assert user.country == 'KZ'
+    assert user.birth_date == date(2000, 1, 1)
+    assert user.bio == 'Updated bio'
+    assert user.telegram_alias == 'updated_user'
+
+
+@pytest.mark.asyncio
+async def test_update_me_updates_only_provided_fields(
+    client: AsyncClient,
+    session: AsyncSession,
+) -> None:
+    await register_user(client)
+
+    user = await get_user(session)
+
+    user.is_email_verified = True
+    user.display_name = 'Old Name'
+    user.country = 'RU'
+    user.bio = 'Old bio'
+
+    await session.commit()
+
+    login_data = await login_user(client)
+
+    response = await client.patch(
+        '/api/v1/auth/me',
+        headers={
+            'Authorization': f"Bearer {login_data['access_token']}",
+        },
+        json={
+            'display_name': 'New Name',
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data['display_name'] == 'New Name'
+    assert data['country'] == 'RU'
+    assert data['bio'] == 'Old bio'
+
+    await session.refresh(user)
+
+    assert user.display_name == 'New Name'
+    assert user.country == 'RU'
+    assert user.bio == 'Old bio'
+
+
+@pytest.mark.asyncio
+async def test_update_me_clears_nullable_fields(
+    client: AsyncClient,
+    session: AsyncSession,
+) -> None:
+    await register_user(client)
+
+    user = await get_user(session)
+
+    user.is_email_verified = True
+    user.display_name = 'Test User'
+    user.country = 'KZ'
+    user.bio = 'Test bio'
+    user.telegram_alias = 'test_user'
+
+    await session.commit()
+
+    login_data = await login_user(client)
+
+    response = await client.patch(
+        '/api/v1/auth/me',
+        headers={
+            'Authorization': f"Bearer {login_data['access_token']}",
+        },
+        json={
+            'display_name': None,
+            'country': None,
+            'bio': None,
+            'telegram_alias': None,
+        },
+    )
+
+    assert response.status_code == 200
+
+    await session.refresh(user)
+
+    assert user.display_name is None
+    assert user.country is None
+    assert user.bio is None
+    assert user.telegram_alias is None
+
+
+@pytest.mark.asyncio
+async def test_update_me_rejects_invalid_data(
+    client: AsyncClient,
+    session: AsyncSession,
+) -> None:
+    await register_user(client)
+
+    user = await get_user(session)
+
+    user.is_email_verified = True
+
+    await session.commit()
+
+    login_data = await login_user(client)
+
+    response = await client.patch(
+        '/api/v1/auth/me',
+        headers={
+            'Authorization': f"Bearer {login_data['access_token']}",
+        },
+        json={
+            'country': 'KAZ',
+        },
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_me_rejects_missing_access_token(
+    client: AsyncClient,
+) -> None:
+    response = await client.patch(
+        '/api/v1/auth/me',
+        json={
+            'display_name': 'New Name',
+        },
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_update_me_rejects_unverified_user(
+    client: AsyncClient,
+) -> None:
+    await register_user(client)
+
+    login_data = await login_user(client)
+
+    response = await client.patch(
+        '/api/v1/auth/me',
+        headers={
+            'Authorization': f"Bearer {login_data['access_token']}",
+        },
+        json={
+            'display_name': 'New Name',
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()['detail'] == 'Email is not verified'
 
 
 @pytest.mark.asyncio

@@ -28,6 +28,8 @@ from schemas.auth import (
     RegisterResponse,
     TokenResponse,
     UserResponse,
+    UserUpdateRequest,
+    UserUpdateResponse,
 )
 from schemas.email import EmailVerificationData
 from services.auth import AuthService
@@ -164,6 +166,21 @@ async def logout_all(current_user: User = Depends(get_current_user),
 )
 async def me(current_user: User = Depends(get_current_user)) -> UserResponse:
     return UserResponse.model_validate(current_user)
+
+
+@router.patch(
+    '/me',
+    response_model=UserUpdateResponse,
+)
+async def update_me(data: UserUpdateRequest,
+                    current_user: User = Depends(get_current_user),
+                    service: AuthService = Depends(get_auth_service)
+                    ) -> UserUpdateResponse:
+    user = await service.update_user(
+        user_id=current_user.id,
+        data=data.model_dump(exclude_unset=True)
+    )
+    return UserUpdateResponse.model_validate(user)
 
 
 @router.post(
