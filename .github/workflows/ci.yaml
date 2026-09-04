@@ -5,6 +5,21 @@ on:
   pull_request:
 
 jobs:
+  quality:
+    if: always()
+    needs:
+      - quality-auth
+      - quality-email-sender
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check quality jobs
+        run: |
+          if [ "${{ needs.quality-auth.result }}" != "success" ] ||
+             [ "${{ needs.quality-email-sender.result }}" != "success" ]; then
+            exit 1
+          fi
+
   quality-auth:
     runs-on: ubuntu-latest
 
