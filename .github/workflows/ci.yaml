@@ -110,5 +110,5 @@ jobs:
           SMTP_USERNAME: test
           SMTP_PASSWORD: test
           FROM_EMAIL: test@example.com
-          BROKER_URL: amqp://guest:guest@localhost:5672//
+          RABBITMQ__URL: amqp://guest:guest@localhost:5672//
         run: uv run pytest

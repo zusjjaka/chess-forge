@@ -37,7 +37,7 @@
 │   │   └── <a href="#post-apiv1authpasswordchange">change</a>
 │   ├── email/
 │   │   ├── <a href="#post-apiv1authemailapproval">approval</a>
-│   │   ├── <a href="#post-apiv1authemailchange">change</a>
+│   │   ├── <a href="#post-apiv1authemailchangerequest">change/request</a>
 │   │   └── <a href="#post-apiv1authemailchangeconfirm">change/confirm</a>
 │   └── <a href="#get-apiv1authme">me</a>
 │
@@ -243,7 +243,7 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 ---
 
-### `POST /api/v1/auth/email/change`
+### `POST /api/v1/auth/email/change/request`
 
 Запрос на смену почты.
 

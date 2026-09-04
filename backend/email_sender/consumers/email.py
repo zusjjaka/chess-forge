@@ -16,7 +16,11 @@ EMAIL_TYPES: dict[str, tuple[str, str]] = {
     'email.password_reset': (
         'password_reset.html',
         'ChessForge - Password Reset',
-    )
+    ),
+    'email.change': (
+        'email_change.html',
+        'ChessForge - Email Change',
+    ),
 }
 
 settings = get_settings()
@@ -39,14 +43,14 @@ async def handle_message(message: AbstractIncomingMessage) -> None:
 
 
 async def consume() -> None:
-    connection = await aio_pika.connect_robust(settings.broker_url)
+    connection = await aio_pika.connect_robust(settings.rabbitmq.url)
 
     channel = await connection.channel()
 
     await channel.set_qos(prefetch_count=1)
 
     queue = await channel.declare_queue(
-        'email_queue',
+        settings.rabbitmq.queue,
         durable=True,
     )
 

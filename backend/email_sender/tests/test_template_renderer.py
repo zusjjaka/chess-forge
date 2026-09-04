@@ -117,3 +117,16 @@ def test_render_password_reset_template(
     )
 
     assert '123456' in result
+
+
+def test_render_email_change_template() -> None:
+    renderer = TemplateRenderer()
+
+    result = renderer.render(
+        'email_change.html',
+        code='123456',
+    )
+
+    assert '123456' in result
+    assert 'Email Change' in result
+    assert 'change the email address' in result

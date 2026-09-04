@@ -1,12 +1,18 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import BaseModel
 from pydantic_settings import (
     BaseSettings,
     SettingsConfigDict,
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+class RabbitmqSettings(BaseModel):
+    url: str
+    queue: str = 'email_queue'
 
 
 class Settings(BaseSettings):
@@ -16,13 +22,14 @@ class Settings(BaseSettings):
     smtp_password: str
     from_email: str
 
-    broker_url: str
+    rabbitmq: RabbitmqSettings
 
     templates_dir: Path = BASE_DIR / 'templates'
 
     model_config = SettingsConfigDict(
         env_file='.env',
         env_file_encoding='utf-8',
+        env_nested_delimiter='__',
         extra='ignore',
     )
 
