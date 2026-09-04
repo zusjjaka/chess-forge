@@ -604,29 +604,25 @@ line_id: UUID
 
 ```json
 {
-  "items": [
+  "id": "uuid",
+  "tag": "italian-main",
+  "moves": [
+    "e2e4",
+    "e7e5",
+    "g1f3",
+    "b8c6",
+    "f1c4"
+  ],
+  "children": [
     {
       "id": "uuid",
-      "tag": "italian-main",
+      "tag": "giuoco-piano",
       "moves": [
-        "e2e4",
-        "e7e5",
-        "g1f3",
-        "b8c6",
-        "f1c4"
+        "f8c5",
+        "b2b4"
       ],
-      "children": [
-        {
-          "id": "uuid",
-          "tag": "giuoco-piano",
-          "moves": [
-            "f8c5",
-            "b2b4"
-          ],
-          "children": []
-        },
-      ]
-    }
+      "children": []
+    },
   ]
 }
 ```

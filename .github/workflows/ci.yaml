@@ -17,6 +17,7 @@ jobs:
     needs:
       - quality-auth
       - quality-email-sender
+      - quality-repertoires
     runs-on: ubuntu-latest
 
     steps:
@@ -24,6 +25,7 @@ jobs:
         run: |
           if [ "${{ needs.quality-auth.result }}" != "success" ] ||
              [ "${{ needs.quality-email-sender.result }}" != "success" ]; then
+             [ "${{ needs.quality-repertoires.result }}" != "success" ]; then
             exit 1
           fi
 
@@ -56,7 +58,7 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql+asyncpg://auth_test:root@localhost:5432/auth_test
+      DATABASE__URL: postgresql+asyncpg://auth_test:root@localhost:5432/auth_test
 
     steps:
       - name: Checkout
@@ -133,4 +135,56 @@ jobs:
           SMTP_PASSWORD: test
           FROM_EMAIL: test@example.com
           RABBITMQ__URL: amqp://guest:guest@localhost:5672//
+        run: uv run pytest
+
+  quality-repertoires:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: repertoire_test
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: repertoire_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U repertoire_test -d repertoire_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        working-directory: backend/repertoires
+        run: uv sync --locked
+
+      - name: Ruff
+        working-directory: backend/repertoires
+        run: uv run ruff check
+
+      - name: Mypy
+        working-directory: backend/repertoires
+        run: uv run mypy .
+
+      - name: Run migrations
+        working-directory: backend/repertoires
+        env:
+          DATABASE__URL: postgresql+psycopg://repertoire_test:root@localhost:5432/repertoire_test
+        run: uv run alembic upgrade head
+
+      - name: Pytest
+        working-directory: backend/repertoires
+        env:
+          DATABASE__URL: postgresql+psycopg://repertoire_test:root@localhost:5432/repertoire_test
         run: uv run pytest

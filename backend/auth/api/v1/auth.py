@@ -44,6 +44,13 @@ router = APIRouter(prefix='/auth', tags=['Authentication'])
 settings = get_settings()
 
 
+@router.get(
+    '/health'
+)
+async def health() -> dict[str, str]:
+    return {'status': 'ok'}
+
+
 @router.post(
     '/register',
     response_model=RegisterResponse,
