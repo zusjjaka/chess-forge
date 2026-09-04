@@ -143,13 +143,13 @@ jobs:
       postgres:
         image: postgres:18
         env:
-          POSTGRES_USER: repertoire_test
+          POSTGRES_USER: repertoires_test
           POSTGRES_PASSWORD: root
-          POSTGRES_DB: repertoire_test
+          POSTGRES_DB: repertoires_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U repertoire_test -d repertoire_test"
+          --health-cmd "pg_isready -U repertoires_test -d repertoires_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
@@ -179,11 +179,11 @@ jobs:
       - name: Run migrations
         working-directory: backend/repertoires
         env:
-          DATABASE__URL: postgresql+psycopg://repertoire_test:root@localhost:5432/repertoire_test
+          DATABASE__URL: postgresql+psycopg://repertoires_test:root@localhost:5432/repertoires_test
         run: uv run alembic upgrade head
 
       - name: Pytest
         working-directory: backend/repertoires
         env:
-          DATABASE__URL: postgresql+psycopg://repertoire_test:root@localhost:5432/repertoire_test
+          DATABASE__URL: postgresql+psycopg://repertoires_test:root@localhost:5432/repertoires_test
         run: uv run pytest
