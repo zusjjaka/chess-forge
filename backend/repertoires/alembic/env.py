@@ -8,6 +8,10 @@ from sqlalchemy import (
 from alembic import context
 from core.config import get_settings
 from db.base import Base
+from models.repertoire import (
+    Line,  # ruff: ignore[unused-import]
+    Repertoire,  # ruff: ignore[unused-import]
+)
 
 config = context.config
 

@@ -24,7 +24,7 @@ jobs:
       - name: Check quality jobs
         run: |
           if [ "${{ needs.quality-auth.result }}" != "success" ] ||
-             [ "${{ needs.quality-email-sender.result }}" != "success" ]; then
+             [ "${{ needs.quality-email-sender.result }}" != "success" ] ||
              [ "${{ needs.quality-repertoires.result }}" != "success" ]; then
             exit 1
           fi
@@ -111,7 +111,6 @@ jobs:
         uses: astral-sh/setup-uv@v6
 
       - name: Set up Python
-        working-directory: backend/email_sender
         run: uv python install 3.13
 
       - name: Install dependencies
