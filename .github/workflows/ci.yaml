@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - auth
-      - reperrtoires
+      - repertoires
       - training
       - engine
   pull_request:
