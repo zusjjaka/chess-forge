@@ -31,7 +31,7 @@ async def test_get_current_user_id_returns_uuid(
         credentials='access-token',
     )
 
-    result = await get_current_user_id(credentials)
+    result = get_current_user_id(credentials)
 
     assert result == user_id
 
@@ -51,7 +51,7 @@ async def test_get_current_user_id_rejects_invalid_uuid(
     )
 
     with pytest.raises(InvalidAccessTokenError):
-        await get_current_user_id(credentials)
+        get_current_user_id(credentials)
 
 
 @pytest.mark.asyncio
@@ -69,7 +69,7 @@ async def test_get_current_user_id_rejects_missing_sub(
     )
 
     with pytest.raises(InvalidAccessTokenError):
-        await get_current_user_id(credentials)
+        get_current_user_id(credentials)
 
 
 @pytest.mark.asyncio
@@ -90,7 +90,7 @@ async def test_get_current_user_id_rejects_invalid_token(
     )
 
     with pytest.raises(InvalidAccessTokenError):
-        await get_current_user_id(credentials)
+        get_current_user_id(credentials)
 
 
 @pytest.mark.asyncio
@@ -111,7 +111,7 @@ async def test_get_current_user_id_rejects_value_error(
     )
 
     with pytest.raises(InvalidAccessTokenError):
-        await get_current_user_id(credentials)
+        get_current_user_id(credentials)
 
 
 @pytest.mark.asyncio
@@ -132,14 +132,14 @@ async def test_get_current_user_id_rejects_key_error(
     )
 
     with pytest.raises(InvalidAccessTokenError):
-        await get_current_user_id(credentials)
+        get_current_user_id(credentials)
 
 
 @pytest.mark.asyncio
 async def test_get_repertoire_service_returns_service() -> None:
     session = MagicMock()
 
-    service = await get_repertoire_service(session)
+    service = get_repertoire_service(session)
 
     assert isinstance(service, RepertoireService)
     assert service.session is session
@@ -149,7 +149,7 @@ async def test_get_repertoire_service_returns_service() -> None:
 async def test_get_line_service_returns_service() -> None:
     session = MagicMock()
 
-    service = await get_line_service(session)
+    service = get_line_service(session)
 
     assert isinstance(service, LineService)
     assert service.session is session
