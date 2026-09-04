@@ -44,3 +44,25 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+
+      # Repertoires
+      - id: repertoires-ruff-check-fix
+        name: Repertoires Ruff check --fix
+        entry: uv run --directory backend/repertoires ruff check --fix
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: repertoires-ruff-check
+        name: Repertoires Ruff check
+        entry: uv run --directory backend/repertoires ruff check
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: repertoires-mypy
+        name: Repertoires Mypy
+        entry: uv run --directory backend/repertoires mypy .
+        language: system
+        types: [python]
+        pass_filenames: false

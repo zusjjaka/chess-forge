@@ -2,7 +2,7 @@
 
 # API
 
-Публичное АПИ поделено на два протокола:
+Публичное API поделено на два протокола:
 
 <style>
   a {
@@ -13,10 +13,10 @@
   }
 </style>
 
-- REST API: <a href="#api">/api/v1/...</a>
-- WebSocket API: <a href="#websocket-api">/ws/v1/...</a>
+* REST API: <a href="#api">/api/v1/...</a>
+* WebSocket API: <a href="#websocket-api">/ws/v1/...</a>
 
-Аутентификация использует JWT. Защищенные http endpoints требуют валидного access токена.
+Аутентификация использует JWT. Защищенные HTTP endpoints требуют валидного access токена.
 
 ---
 
@@ -43,8 +43,9 @@
 │
 ├── <a href="#get-apiv1repertoires">repertoires/</a>
 │   └── <a href="#get-apiv1repertoiresrepertoire_id">{repertoire_id}</a>
-│       └── <a href="#get-apiv1repertoiresrepertoire_idlines">lines/</a>
-│           └── <a href="#patch-apiv1repertoiresrepertoire_idlinesline_id">{line_id}</a>
+│       ├── <a href="#get-apiv1repertoiresrepertoire_idlines">lines/</a>
+│       │   └── <a href="#get-apiv1repertoiresrepertoire_idlinesline_id">{line_id}</a>
+│       └── ...
 │
 └── training/
     ├── <a href="#get-apiv1trainingsessions">sessions/</a>
@@ -75,7 +76,7 @@
   "password": "string",
   "password_repeat": "string"
 }
-```
+````
 
 **Output — `201 Created`**
 
@@ -154,6 +155,8 @@ Refresh token передается серверу через HttpOnly, Secure, S
 
 **Input**
 
+Refresh token передается через cookie.
+
 **Output — `200 OK`**
 
 ```json
@@ -164,7 +167,7 @@ Refresh token передается серверу через HttpOnly, Secure, S
 }
 ```
 
-Refresh token устанавливается сервером в HttpOnly, Secure, Same-Site: Strict cookie.
+Refresh token устанавливается сервером в HttpOnly, Secure, SameSite: Strict cookie.
 
 ---
 
@@ -229,7 +232,7 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 ### `POST /api/v1/auth/email/approval`
 
-Подтверждение почты через отправленный код
+Подтверждение почты через отправленный код.
 
 **Input**
 
@@ -307,7 +310,7 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 ### `PATCH /api/v1/auth/me`
 
-Изменяет данные пользователя
+Изменяет данные пользователя.
 
 **Input**
 
@@ -321,21 +324,14 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 Ограничения:
 
-- display_name - от 1 до 25 символов.
-
-- gender - M или F.
-
-- country - двухбуквенный код страны в формате ISO 3166-1 alpha-2.
-
-- birth_date - дата рождения; допускается возраст примерно от 6 до 100 лет.
-
-- bio - от 1 до 75 символов.
-
-- telegram_alias - от 5 до 32 символов, начинается с буквы и содержит только латинские буквы, цифры и _.
-
-- null можно передать для очистки значения.
-
-- Если поле не передано, его значение не изменяется.
+* display_name — от 1 до 25 символов;
+* gender — M или F;
+* country — двухбуквенный код страны в формате ISO 3166-1 alpha-2;
+* birth_date — дата рождения; допускается возраст примерно от 6 до 100 лет;
+* bio — от 1 до 75 символов;
+* telegram_alias — от 5 до 32 символов, начинается с буквы и содержит только латинские буквы, цифры и `_`;
+* `null` можно передать для очистки значения;
+* если поле не передано, его значение не изменяется.
 
 **Output — `200 OK`**
 
@@ -356,19 +352,33 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 # Repertoires
 
-repertoire - коллекция дебютов и репертуаров пользователя
+`repertoire` — коллекция дебютов и репертуаров пользователя.
+
+Каждый репертуар принадлежит одному пользователю.
+
+Ownership определяется по JWT. `user_id` не передаётся клиентом при создании или изменении ресурса.
+
+`side` задаётся при создании репертуара и после этого не изменяется.
+
+Изменения структуры линий увеличивают `version` репертуара. Изменения метаданных репертуара `version` не увеличивают.
+
+---
 
 ### `GET /api/v1/repertoires`
 
-Возвращает репертуар авторизованного пользователя.
+Возвращает репертуары авторизованного пользователя.
 
 **Input**
 
-Параметры запроса:
+Параметр запроса:
 
 ```text
 /api/v1/repertoires?page=1
 ```
+
+`page` начинается с `1`.
+
+Размер страницы — `20`.
 
 **Output — `200 OK`**
 
@@ -376,17 +386,18 @@ repertoire - коллекция дебютов и репертуаров пол�
 {
   "items": [
     {
-      "name": "White repertoire",
       "id": "uuid",
-      "version": 2,
-      "side": "White",
+      "user_id": "uuid",
+      "name": "White repertoire",
+      "description": "My main white repertoire",
+      "side": "white",
+      "version": 1,
       "created_at": "2026-01-01T12:00:00Z",
-      "updated_at": "2026-01-01T12:03:33Z",
+      "updated_at": "2026-01-01T12:03:33Z"
     }
   ],
   "page": 1,
-  "limit": 20,
-  "total": 1
+  "pages": 1
 }
 ```
 
@@ -394,7 +405,11 @@ repertoire - коллекция дебютов и репертуаров пол�
 
 ### `POST /api/v1/repertoires`
 
-Создать новый репертуар.
+Создаёт новый репертуар.
+
+При создании автоматически создаётся единственная root line репертуара.
+
+Root line нельзя создать отдельно через API.
 
 **Input**
 
@@ -402,18 +417,36 @@ repertoire - коллекция дебютов и репертуаров пол�
 {
   "name": "White repertoire",
   "description": "My main white repertoire",
-  "side": "Black"
+  "side": "white",
+  "root_moves": [
+    "e2e4"
+  ]
 }
 ```
+
+Ограничения:
+
+* `name` — от 1 до 40 символов;
+* `description` — строка;
+* `side` — `white` или `black`;
+* `root_moves` — непустой список UCI ходов;
+* каждый move должен соответствовать синтаксису UCI;
+* каждый move должен быть легальным относительно текущей шахматной позиции;
+* для `white` длина `root_moves` должна быть нечётной;
+* для `black` длина `root_moves` должна быть чётной.
+
+Root line создаётся внутри той же транзакции, что и repertoire.
 
 **Output — `201 Created`**
 
 ```json
 {
-  "name": "White repertoire",
   "id": "uuid",
-  "side": "Black",
+  "user_id": "uuid",
+  "name": "White repertoire",
   "description": "My main white repertoire",
+  "side": "white",
+  "version": 1,
   "created_at": "2026-01-01T12:00:00Z",
   "updated_at": "2026-01-01T12:00:00Z"
 }
@@ -423,7 +456,7 @@ repertoire - коллекция дебютов и репертуаров пол�
 
 ### `GET /api/v1/repertoires/{repertoire_id}`
 
-Возвращает определенный репертуар.
+Возвращает определённый репертуар.
 
 **Input**
 
@@ -437,15 +470,18 @@ repertoire_id: UUID
 
 ```json
 {
-  "name": "White repertoire",
   "id": "uuid",
-  "version": 2,
-  "side": "Black",
+  "user_id": "uuid",
+  "name": "White repertoire",
   "description": "My main white repertoire",
+  "side": "white",
+  "version": 2,
   "created_at": "2026-01-01T12:00:00Z",
   "updated_at": "2026-01-01T12:03:33Z"
 }
 ```
+
+Если репертуар не существует или принадлежит другому пользователю, возвращается `404 Not Found`.
 
 ---
 
@@ -453,23 +489,80 @@ repertoire_id: UUID
 
 Обновляет метаданные репертуара.
 
+`side` изменить через этот endpoint нельзя.
+
 **Input**
+
+Все поля опциональные:
 
 ```json
 {
-  "side": "Black",
   "name": "Updated name",
   "description": "Updated description"
 }
 ```
 
-**Output — `204 No Content`**
+Поддерживаются следующие варианты:
+
+```json
+{}
+```
+
+Ничего не изменяет.
+
+```json
+{
+  "name": "Updated name"
+}
+```
+
+Изменяет только имя.
+
+```json
+{
+  "description": null
+}
+```
+
+Очищает description, устанавливая его в пустую строку.
+
+```json
+{
+  "description": ""
+}
+```
+
+Также очищает description.
+
+Если поле не передано, его значение не изменяется.
+
+Ограничения:
+
+* `name` — от 1 до 40 символов;
+* `description` — строка или `null`.
+
+`version` при изменении метаданных не увеличивается.
+
+**Output — `200 OK`**
+
+```json
+{
+  "id": "uuid",
+  "user_id": "uuid",
+  "name": "Updated name",
+  "description": "Updated description",
+  "side": "white",
+  "version": 1,
+  "created_at": "2026-01-01T12:00:00Z",
+  "updated_at": "2026-01-01T12:03:33Z"
+}
+```
 
 ---
 
 ### `DELETE /api/v1/repertoires/{repertoire_id}`
 
-Удаляет репертуар.
+Удаляет репертуар вместе со всеми его линиями.
 
 **Input**
 
@@ -481,56 +574,91 @@ repertoire_id: UUID
 
 **Output — `204 No Content`**
 
+Если репертуар не существует или принадлежит другому пользователю, возвращается `404 Not Found`.
+
 ---
 
-## Repertoire Lines
+# Repertoire Lines
+
+Линии образуют дерево внутри репертуара.
+
+Каждый репертуар имеет ровно один root line.
+
+Root line:
+
+* создаётся автоматически вместе с repertoire;
+* не имеет `parent_id`;
+* имеет непустой `moves`;
+* не может быть создан отдельно;
+* не может быть удалён;
+* сохраняет свой `id` при замене дерева через `PUT /lines`.
+
+`moves` содержит последовательность ходов, специфичную для данной линии.
+
+Каждая линия должна содержать хотя бы один ход.
+
+Leaf определяется отсутствием дочерних линий.
+
+Пример:
+
+```text
+root [e2e4]
+├── main-line [e7e5, g1f3]
+│   ├── giuoco-piano [b8c6, f1c4]
+│   └── two-knights [g8f6, f3g5]
+│
+└── scotch [e7e5, d2d4]
+    └── variation [e5d4, g1f3]
+```
+
+Для каждой линии:
+
+* `moves` не может быть пустым;
+* каждый move должен соответствовать синтаксису UCI;
+* каждый move должен быть легальным относительно полной позиции ancestry;
+* для `white` длина `moves` должна быть нечётной;
+* для `black` длина `moves` должна быть чётной.
+
+---
 
 ### `GET /api/v1/repertoires/{repertoire_id}/lines`
 
-Возвращает все варианты репертуара
+Возвращает дерево репертуара, начиная с root line.
 
 **Input**
 
-Опциональные параметры запроса:
+Параметр пути:
 
 ```text
-?exclude_tag_regex=tag-1&exclude_tag_regex=tag-2
-?exclude_tag_regex=^tag-[12]
+repertoire_id: UUID
 ```
 
-Исключаются линии, соответствующие хотя бы одному регулярному выражению.
+Query parameters отсутствуют.
 
 **Output — `200 OK`**
 
 ```json
 {
-  "items": [
+  "id": "uuid",
+  "tag": null,
+  "moves": [
+    "e2e4"
+  ],
+  "children": [
     {
-      "tag": "italian-main",
       "id": "uuid",
+      "tag": "main-line",
       "moves": [
-        "e2e4",
         "e7e5",
-        "g1f3",
-        "b8c6",
-        "f1c4"
+        "g1f3"
       ],
       "children": [
         {
+          "id": "uuid",
           "tag": "giuoco-piano",
-          "id": "uuid",
           "moves": [
-            "f8c5",
-            "b2b4"
-          ],
-          "children": []
-        },
-        {
-          "tag": "two-knights",
-          "id": "uuid",
-          "moves": [
-            "g8f6",
-            "f3g5"
+            "b8c6",
+            "f1c4"
           ],
           "children": []
         }
@@ -544,52 +672,93 @@ repertoire_id: UUID
 
 ### `PUT /api/v1/repertoires/{repertoire_id}/lines`
 
-Полностью меняет вариацию в репертуаре.
+Полностью заменяет содержимое дерева репертуара.
+
+Root line сохраняет свой существующий `id`. Его `tag` и `moves`, а также все дочерние линии заменяются содержимым запроса.
+
+Операция выполняется атомарно.
+
+Для защиты от перезаписи изменений другого клиента используется optimistic locking через `version`.
 
 **Input**
 
 ```json
 {
-  "items": [
-    {
-      "tag": "italian-main",
-      "moves": [
-        "e2e4",
-        "e7e5",
-        "g1f3",
-        "b8c6",
-        "f1c4"
-      ],
-      "children": [
-        {
-          "tag": "giuoco-piano",
-          "moves": [
-            "f8c5",
-            "b2b4"
-          ],
-          "children": []
-        },
-        {
-          "tag": "two-knights",
-          "moves": [
-            "g8f6",
-            "f3g5"
-          ],
-          "children": []
-        }
-      ]
-    }
-  ]
+  "version": 1,
+  "tree": {
+    "tag": null,
+    "moves": [
+      "e2e4"
+    ],
+    "children": [
+      {
+        "tag": "main-line",
+        "moves": [
+          "e7e5",
+          "g1f3"
+        ],
+        "children": [
+          {
+            "tag": "giuoco-piano",
+            "moves": [
+              "b8c6",
+              "f1c4"
+            ],
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
 }
 ```
 
+Ограничения:
+
+* `version` — целое число не меньше `1`;
+* `tree` представляет root line;
+* `tree.moves` — непустой список;
+* `children` может быть пустым;
+* каждая линия дерева должна иметь непустой `moves`;
+* каждый move должен соответствовать синтаксису UCI;
+* каждый move должен быть легальным относительно полной позиции ancestry;
+* для `white` длина `moves` каждой линии должна быть нечётной;
+* для `black` длина `moves` каждой линии должна быть чётной.
+
+Перед изменением базы данных всё входное дерево полностью валидируется.
+
+После валидации сервер повторно проверяет актуальную `version` репертуара внутри транзакции.
+
+Если переданная версия отличается от актуальной версии репертуара, дерево не изменяется.
+
 **Output — `204 No Content`**
+
+После успешной операции `repertoire.version` увеличивается ровно на `1`.
+
+**Output — `409 Conflict`**
+
+Возвращается, если переданная версия устарела.
+
+```text
+Repertoire version conflict
+```
+
+Например:
+
+```text
+Client version: 5
+Current version: 6
+        ↓
+409 Conflict
+```
+
+В этом случае никакие изменения дерева не применяются.
 
 ---
 
 ### `GET /api/v1/repertoires/{repertoire_id}/lines/{line_id}`
 
-Возвращает определенную линию репертуара.
+Возвращает поддерево, начинающееся с указанной линии.
 
 **Input**
 
@@ -604,38 +773,35 @@ line_id: UUID
 
 ```json
 {
-  "items": [
+  "id": "uuid",
+  "tag": "main-line",
+  "moves": [
+    "e7e5",
+    "g1f3"
+  ],
+  "children": [
     {
       "id": "uuid",
-      "tag": "italian-main",
+      "tag": "giuoco-piano",
       "moves": [
-        "e2e4",
-        "e7e5",
-        "g1f3",
         "b8c6",
         "f1c4"
       ],
-      "children": [
-        {
-          "id": "uuid",
-          "tag": "giuoco-piano",
-          "moves": [
-            "f8c5",
-            "b2b4"
-          ],
-          "children": []
-        },
-      ]
+      "children": []
     }
   ]
 }
 ```
 
+Если линия не существует или не принадлежит указанному репертуару, возвращается `404 Not Found`.
+
 ---
 
 ### `POST /api/v1/repertoires/{repertoire_id}/lines/{line_id}`
 
-Добавляет разветвление в репертуар относительно родительского line_id.
+Добавляет дочернюю линию относительно указанного `line_id`.
+
+Root line через этот endpoint создать нельзя.
 
 **Input**
 
@@ -648,35 +814,143 @@ line_id: UUID
 
 ```json
 {
-    "tag": "some-tag",
-    "moves": ["e2e4", "e7e5", "g1f3"]
+  "tag": "main-line",
+  "moves": [
+    "e7e5",
+    "g1f3"
+  ]
 }
 ```
 
-**Output — `204 No Content`**
+Ограничения:
 
----
+* `moves` — непустой список;
+* каждый move должен соответствовать синтаксису UCI;
+* каждый move должен быть легальным относительно позиции после ancestry родительской линии;
+* для `white` длина `moves` должна быть нечётной;
+* для `black` длина `moves` должна быть чётной;
+* `tag` может быть `null`.
 
-### `DELETE /api/v1/repertoires/{repertoire_id}/lines/{line_id}`
+**Output — `201 Created`**
 
-Удаляет саму линию и всё её поддерево.
-
-**Input**
-
-Параметры пути:
-
-```text
-repertoire_id: UUID
-line_id: UUID
+```json
+{
+  "id": "uuid",
+  "tag": "main-line",
+  "moves": [
+    "e7e5",
+    "g1f3"
+  ],
+  "children": []
+}
 ```
 
-**Output — `204 No Content`**
+После успешной операции `repertoire.version` увеличивается на `1`.
 
 ---
 
 ### `PATCH /api/v1/repertoires/{repertoire_id}/lines/{line_id}`
 
-Изменяет определенную линию
+Изменяет определённую линию.
+
+**Input**
+
+Все поля опциональные:
+
+```json
+{
+  "tag": "new-tag",
+  "moves": [
+    "e7e5",
+    "g1f3"
+  ]
+}
+```
+
+Пустой PATCH допустим:
+
+```json
+{}
+```
+
+и не изменяет линию.
+
+`tag: null` очищает tag:
+
+```json
+{
+  "tag": null
+}
+```
+
+`moves` при передаче должен быть непустым.
+
+### Ограничение изменения moves
+
+Изменение `moves` разрешено только для leaf line.
+
+Если у линии существуют дочерние линии, её `moves` нельзя изменять.
+
+Например:
+
+```text
+line_a [e4, e5]
+└── line_b [Nf3, Nc6]
+```
+
+Пока `line_b` существует:
+
+```json
+{
+  "moves": [
+    "d2d4"
+  ]
+}
+```
+
+для `line_a` недопустим.
+
+При этом `tag` родительской линии менять можно:
+
+```json
+{
+  "tag": "new-tag"
+}
+```
+
+После удаления всех дочерних линий `moves` линии снова можно изменить.
+
+Каждый новый move должен быть:
+
+* синтаксически корректным UCI;
+* легальным относительно полной позиции ancestry;
+* согласованным с parity-правилом repertoire.
+
+**Output — `200 OK`**
+
+```json
+{
+  "id": "uuid",
+  "tag": "new-tag",
+  "moves": [
+    "e7e5",
+    "g1f3"
+  ],
+  "children": []
+}
+```
+
+После изменения линии `repertoire.version` увеличивается на `1`.
+
+---
+
+### `DELETE /api/v1/repertoires/{repertoire_id}/lines/{line_id}`
+
+Удаляет указанную child line и всё её поддерево.
+
+Root line удалить нельзя.
+
+Удаление subtree выполняется каскадно.
 
 **Input**
 
@@ -687,20 +961,21 @@ repertoire_id: UUID
 line_id: UUID
 ```
 
-```json
-{
-    "tag": "new-tag",
-    "moves": [
-        "new-move-1",
-        "new-move-2",
-        ...
-    ]
-}
+**Output — `204 No Content`**
+
+После успешной операции `repertoire.version` увеличивается на `1`.
+
+Попытка удалить root line возвращает:
+
+```text
+400 Bad Request
 ```
 
-Все поля опциональны
+Если линия не существует или не принадлежит указанному репертуару:
 
-**Output — `204 No Content`**
+```text
+404 Not Found
+```
 
 ---
 
@@ -741,7 +1016,7 @@ line_id: UUID
 
 ### `POST /api/v1/training/sessions`
 
-Создать сессию тренировки.
+Создаёт сессию тренировки.
 
 **Input**
 
@@ -756,8 +1031,9 @@ line_id: UUID
 }
 ```
 
-line_id считается фиксированной линией и не может быть исключенной.
-До неё берутся родительские линии, а перед ней - наугад, но не входящие в фильтры.
+`line_id` считается фиксированной линией и не может быть исключённой.
+
+До неё берутся родительские линии, а перед ней — наугад, но не входящие в фильтры.
 
 **Output — `201 Created`**
 
@@ -793,12 +1069,19 @@ session_id: UUID
   "status": "invalidated",
   "line_id": "uuid",
   "repertoire_version": 7,
-  "current_ply": 6,
+  "current_ply": 6
 }
 ```
 
-version проверяет версии репертуара в момент создания сессии и в момент хода.
-repertoire.version != training_session.repertoire_version: status -> invalidated.
+Версия проверяет состояние репертуара в момент создания сессии и в момент хода.
+
+Если:
+
+```text
+repertoire.version != training_session.repertoire_version
+```
+
+сессия получает статус `invalidated`.
 
 ---
 
@@ -831,7 +1114,8 @@ session_id: UUID
 ```
 
 Тренировочный сервис проверяет валидность хода и обновляет состояние сессии.
-При неправильном ответе, сессия становится failed.
+
+При неправильном ответе сессия становится `failed`.
 
 ---
 
@@ -840,6 +1124,8 @@ session_id: UUID
 Завершает тренировку.
 
 **Input**
+
+Нет.
 
 **Output — `200 OK`**
 
@@ -859,13 +1145,17 @@ session_id: UUID
 
 Позволяет в реальном времени получать анализ, обновляющийся во время партии.
 
-Клиент устанавливает WebSocket соединение и отправляет позиции для анализа. Engine service с помощью движка Стокфиш стримит лучшие ходы позиции.
+Клиент устанавливает WebSocket соединение и отправляет позиции для анализа. Engine service с помощью движка Stockfish стримит лучшие ходы позиции.
 
 ### Client → Server
 
 ```json
 {
-  "moves": ["e2e4", "e7e5", "g1f3"]
+  "moves": [
+    "e2e4",
+    "e7e5",
+    "g1f3"
+  ]
 }
 ```
 
@@ -901,17 +1191,24 @@ session_id: UUID
 }
 ```
 
-Соединение остается открытым, пока пользователь запрашивает анализ позиции. Сервер может закрыть соединение, когда пользователь прекращает анализ.
+Соединение остаётся открытым, пока пользователь запрашивает анализ позиции. Сервер может закрыть соединение, когда пользователь прекращает анализ.
 
 ---
 
 # Common HTTP Responses
 
-Защищенные урлы могут вернуть:
+Защищённые URL могут вернуть:
 
 ### `400 Bad Request`
 
-Запрос некорректен и не может быть обработан сервером. Нарушение правил или бизнес логики.
+Запрос некорректен или нарушает бизнес-правила.
+
+Например:
+
+* попытка удалить root line;
+* попытка изменить `moves` линии, у которой есть children;
+* попытка изменить `moves` с нарушением domain rules;
+* попытка передать нелегальную шахматную последовательность.
 
 ### `401 Unauthorized`
 
@@ -919,29 +1216,44 @@ Access токен отсутствует, недействителен или и
 
 ### `403 Forbidden`
 
-У аутентифицированного пользователя нет доступа к ресурсу.
+Используется только для случаев, когда ресурс существует, но политика доступа явно запрещает операцию.
+
+Для repertoire/line ресурсов отсутствие доступа к чужому ресурсу не раскрывается и возвращается как `404 Not Found`.
 
 ### `404 Not Found`
 
-Запрашиваемый ресурс не существует.
+Запрашиваемый ресурс не существует или недоступен текущему пользователю.
+
+Для repertoire/line ресурсов это также используется, когда ресурс существует, но принадлежит другому пользователю.
 
 ### `405 Method Not Allowed`
 
-HTTP-Метод не существует для данного endpoint.
+HTTP-метод не существует для данного endpoint.
 
 ### `409 Conflict`
 
-Запрашиваемые операции конфликтуют с текущим состоянием.
+Запрашиваемая операция конфликтует с текущим состоянием ресурса.
 
-### `415 Unsopported Media Type`
+Для `PUT /api/v1/repertoires/{repertoire_id}/lines` используется при конфликте версии репертуара.
+
+### `415 Unsupported Media Type`
 
 Неправильный формат передаваемого тела.
 
 ### `422 Unprocessable Entity`
 
-Тело запроса не прошло валидацию.
+Тело запроса не прошло Pydantic validation.
 
-### `429 Too Mant Requests`
+Например:
+
+* некорректный UUID;
+* неверный формат UCI move;
+* пустой `moves`;
+* превышена максимальная длина `tag`;
+* некорректное значение `side`;
+* `version < 1`.
+
+### `429 Too Many Requests`
 
 Слишком много запросов. Ограничение с rate limiting.
 

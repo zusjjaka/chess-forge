@@ -10,13 +10,13 @@
 
 В production-архитектуре PostgreSQL разделён на **три отдельные базы данных**, каждая из которых принадлежит отдельному микросервису:
 
-* **`auth_db`** — база данных `Auth Service`, отвечающая за пользователей, аутентификацию, refresh-токены и операции с email и паролем.
-* **`repertoire_db`** — база данных `Repertoire Service`, отвечающая за шахматные репертуары и их линии.
-* **`training_db`** — база данных `Training Service`, отвечающая за тренировочные сессии и их аналитику.
+* **`auth_db`** - база данных `Auth Service`, отвечающая за пользователей, аутентификацию, refresh-токены и операции с email и паролем.
+* **`repertoire_db`** - база данных `Repertoire Service`, отвечающая за шахматные репертуары и их линии.
+* **`training_db`** - база данных `Training Service`, отвечающая за тренировочные сессии и их аналитику.
 
 Базы данных являются независимыми. Связи между сущностями разных сервисов не являются PostgreSQL Foreign Keys.
 
-## Auth Service — `auth_db`
+## Auth Service - `auth_db`
 
 ### `users`
 
@@ -95,7 +95,7 @@
 | `used_at`    | `timestamptz`  | Время использования кода. `NULL`, если код ещё не использован. |
 | `created_at` | `timestamptz`  | Время создания кода.                                           |
 
-## Repertoire Service — `repertoire_db`
+## Repertoire Service - `repertoire_db`
 
 ### `repertoires`
 
@@ -126,7 +126,7 @@
 | `created_at`    | `timestamptz`  | Дата и время создания линии.                                       |
 | `updated_at`    | `timestamptz`  | Дата и время последнего изменения линии.                           |
 
-## Training Service — `training_db`
+## Training Service - `training_db`
 
 ### `training_sessions`
 

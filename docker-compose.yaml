@@ -7,10 +7,21 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
+      postgres_auth:
         condition: service_healthy
 
-  postgres:
+  repertoires:
+    build:
+      context: ./backend/repertoires
+    environment:
+      DATABASE__URL: postgresql+asyncpg://repertoire:root@repertoires_postgres:5432/repertoires
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres_repertoires:
+        condition: service_healthy
+
+  postgres_auth:
     image: postgres:18
     environment:
       POSTGRES_USER: ${AUTH_DB_USER}
@@ -22,6 +33,22 @@ services:
       - auth_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER} -d ${AUTH_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres_repertoires:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${REPERTOIRE_DB_USER}
+      POSTGRES_PASSWORD: ${REPERTOIRE_DB_PASSWORD}
+      POSTGRES_DB: ${REPERTOIRE_DB_NAME}
+    ports:
+      - "5433:5432"
+    volumes:
+      - repertoires_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${REPERTOIRE_DB_USER} -d ${REPERTOIRE_DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -52,4 +79,5 @@ services:
 
 volumes:
   auth_postgres_data:
+  repertoires_postgres_data:
   rabbitmq_data:
