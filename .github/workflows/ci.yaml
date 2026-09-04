@@ -2,7 +2,14 @@ name: CI
 
 on:
   push:
+    branches:
+      - auth
+      - repertoires
+      - training
+      - engine
   pull_request:
+    branches:
+      - main
 
 jobs:
   quality:
