@@ -9,10 +9,12 @@ from api.dependencies import (
     get_unverified_current_user,
     get_password_reset_service,
     get_email_verification_service,
+    get_email_change_service,
 )
 from services.verification_code import (
     PasswordResetService,
     EmailVerificationService,
+    EmailChangeService,
 )
 from exceptions import (
     EmailNotConfirmedError,
@@ -182,4 +184,13 @@ def test_get_password_reset_service(
     service = get_email_verification_service(session)
 
     assert isinstance(service, EmailVerificationService)
+    assert service.session is session
+
+
+def test_get_email_change_service(
+    session: AsyncMock,
+) -> None:
+    service = get_email_change_service(session=session)
+
+    assert isinstance(service, EmailChangeService)
     assert service.session is session

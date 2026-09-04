@@ -6,6 +6,7 @@ from exceptions import VerificationCodeInvalidError
 from repositories.refresh_token import RefreshTokenRepository
 from repositories.user import UserRepository
 from repositories.verification_code import (
+    EmailChangeCodeRepository,
     EmailVerificationCodeRepository,
     PasswordResetCodeRepository,
 )
@@ -75,5 +76,38 @@ class PasswordResetService:
         await self.refresh_tokens.revoke_all_for_user(user.id)
 
         await self.codes.mark_as_used(reset_code.id)
+
+        await self.session.commit()
+
+
+class EmailChangeService:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+        self.codes = EmailChangeCodeRepository(session=session)
+        self.users = UserRepository(session=session)
+
+    async def confirm(self,
+                      user_id: uuid.UUID,
+                      code: str
+                      ) -> None:
+        code_hash = hash_secret(code)
+
+        email_change_code = await self.codes.get_valid_by_user_id(
+            user_id=user_id,
+            code_hash=code_hash,
+        )
+
+        if email_change_code is None:
+            raise VerificationCodeInvalidError
+
+        user = await self.users.get_by_id(user_id)
+
+        if user is None:
+            raise VerificationCodeInvalidError
+
+        user.email = email_change_code.new_email
+        user.is_email_verified = True
+
+        await self.codes.mark_as_used(email_change_code.id)
 
         await self.session.commit()

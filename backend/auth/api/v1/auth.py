@@ -9,6 +9,7 @@ from fastapi import (
 from api.dependencies import (
     get_auth_service,
     get_current_user,
+    get_email_change_service,
     get_email_verification_service,
     get_password_reset_service,
     get_unverified_current_user,
@@ -17,6 +18,8 @@ from core.config import get_settings
 from exceptions import RefreshTokenInvalidError
 from models.user import User
 from schemas.auth import (
+    EmailChangeConfirm,
+    EmailChangeRequest,
     LoginRequest,
     PasswordChange,
     PasswordResetConfirm,
@@ -29,6 +32,7 @@ from schemas.auth import (
 from schemas.email import EmailVerificationData
 from services.auth import AuthService
 from services.verification_code import (
+    EmailChangeService,
     EmailVerificationService,
     PasswordResetService,
 )
@@ -216,4 +220,34 @@ async def change_password(data: PasswordChange,
         user_id=current_user.id,
         current_password=data.current_password,
         new_password=data.new_password,
+    )
+
+
+@router.post(
+    '/email/change/request',
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def change_email(data: EmailChangeRequest,
+                       current_user: User = Depends(get_current_user),
+                       service: AuthService = Depends(get_auth_service)
+                       ) -> None:
+    await service.request_email_change(
+        user_id=current_user.id,
+        new_email=data.new_email,
+        password=data.password,
+    )
+
+
+@router.post(
+    '/email/change/confirm',
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def confirm_email_change(
+        data: EmailChangeConfirm,
+        current_user: User = Depends(get_current_user),
+        service: EmailChangeService = Depends(get_email_change_service)
+        ) -> None:
+    await service.confirm(
+        user_id=current_user.id,
+        code=data.code,
     )

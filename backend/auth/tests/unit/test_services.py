@@ -5,31 +5,44 @@ from uuid import uuid4
 import pytest
 
 from exceptions import (
+    EmailSameError,
     InvalidCredentialsError,
+    PasswordInvalidError,
     RefreshTokenExpiredError,
     RefreshTokenInvalidError,
     RefreshTokenReuseError,
     UserAlreadyExistError,
     VerificationCodeInvalidError,
-    PasswordInvalidError,
 )
 from models.refresh_token import RefreshToken
 from models.user import User
 from models.verification_code import (
+    EmailChangeCode,
     EmailVerificationCode,
     PasswordResetCode,
 )
 from services.verification_code import (
-    PasswordResetService,
+    EmailChangeService,
     EmailVerificationService,
+    PasswordResetService,
 )
 from publishers.email import EmailPublisher
 from services.auth import AuthService
-
 from utils.security import (
     verify_password,
     hash_password,
 )
+from core.config import get_settings
+
+
+settings = get_settings()
+
+
+@pytest.fixture
+def email_change_service(
+    session: AsyncMock,
+) -> EmailChangeService:
+    return EmailChangeService(session=session)
 
 
 @pytest.fixture
@@ -1319,3 +1332,373 @@ async def test_change_user_password_invalid_current_password(
 
     service.users.get_by_id.assert_awaited_once_with(user.id)
     service.session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_request_email_change(
+    service: AuthService,
+    user: User,
+) -> None:
+    new_email = 'new@example.com'
+    message_id = uuid4()
+    expires_at = datetime.now(UTC) + timedelta(minutes=10)
+
+    with (
+        patch.object(
+            service.users,
+            'get_by_id',
+            new_callable=AsyncMock,
+            return_value=user,
+        ) as get_user,
+        patch.object(
+            service.users,
+            'get_by_email',
+            new_callable=AsyncMock,
+            return_value=None,
+        ) as get_by_email,
+        patch(
+            'services.auth.verify_password',
+            return_value=True,
+        ) as verify_password_mock,
+        patch(
+            'services.auth.generate_verification_code',
+            return_value='123456',
+        ) as generate_code,
+        patch(
+            'services.auth.hash_secret',
+            return_value=b'code-hash',
+        ) as hash_secret_mock,
+        patch.object(
+            service.email_change_codes,
+            'create',
+            new_callable=AsyncMock,
+        ) as create_code,
+    ):
+        create_code.return_value = type(
+            'EmailChangeCode',
+            (),
+            {'id': message_id},
+        )()
+
+        await service.request_email_change(
+            user_id=user.id,
+            new_email=new_email,
+            password='password123',
+        )
+
+    get_user.assert_awaited_once_with(user.id)
+    verify_password_mock.assert_called_once_with(
+        'password123',
+        user.password_hash,
+    )
+    get_by_email.assert_awaited_once_with(new_email)
+    generate_code.assert_called_once()
+    hash_secret_mock.assert_called_once_with('123456')
+
+    create_code.assert_awaited_once()
+
+    kwargs = create_code.await_args.kwargs
+
+    assert kwargs['user_id'] == user.id
+    assert kwargs['new_email'] == new_email
+    assert kwargs['code_hash'] == b'code-hash'
+    assert datetime.now(UTC) < kwargs['expires_at']
+    assert kwargs['expires_at'] <= (
+        datetime.now(UTC) + settings.verification_code_lifetime
+    )
+
+    service.session.commit.assert_awaited_once()
+
+    service.email_publisher.publish_email_change.assert_awaited_once_with(
+        email=new_email,
+        code='123456',
+        message_id=message_id,
+    )
+
+
+@pytest.mark.asyncio
+async def test_request_email_change_user_not_found(
+    service: AuthService,
+) -> None:
+    user_id = uuid4()
+
+    with patch.object(
+        service.users,
+        'get_by_id',
+        new_callable=AsyncMock,
+        return_value=None,
+    ) as get_user:
+        with pytest.raises(PasswordInvalidError):
+            await service.request_email_change(
+                user_id=user_id,
+                new_email='new@example.com',
+                password='password123',
+            )
+
+    get_user.assert_awaited_once_with(user_id)
+    service.session.commit.assert_not_awaited()
+    service.email_publisher.publish_email_change.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_request_email_change_invalid_password(
+    service: AuthService,
+    user: User,
+) -> None:
+    with (
+        patch.object(
+            service.users,
+            'get_by_id',
+            new_callable=AsyncMock,
+            return_value=user,
+        ) as get_user,
+        patch(
+            'services.auth.verify_password',
+            return_value=False,
+        ) as verify_password_mock,
+    ):
+        with pytest.raises(PasswordInvalidError):
+            await service.request_email_change(
+                user_id=user.id,
+                new_email='new@example.com',
+                password='wrong-password',
+            )
+
+    get_user.assert_awaited_once_with(user.id)
+    verify_password_mock.assert_called_once_with(
+        'wrong-password',
+        user.password_hash,
+    )
+    service.session.commit.assert_not_awaited()
+    service.email_publisher.publish_email_change.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_request_email_change_same_email(
+    service: AuthService,
+    user: User,
+) -> None:
+    with (
+        patch.object(
+            service.users,
+            'get_by_id',
+            new_callable=AsyncMock,
+            return_value=user,
+        ) as get_user,
+        patch(
+            'services.auth.verify_password',
+            return_value=True,
+        ) as verify_password_mock,
+    ):
+        with pytest.raises(EmailSameError):
+            await service.request_email_change(
+                user_id=user.id,
+                new_email=user.email,
+                password='password123',
+            )
+
+    get_user.assert_awaited_once_with(user.id)
+    verify_password_mock.assert_called_once_with(
+        'password123',
+        user.password_hash,
+    )
+    service.session.commit.assert_not_awaited()
+    service.email_publisher.publish_email_change.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_request_email_change_email_already_exists(
+    service: AuthService,
+    user: User,
+) -> None:
+    existing_user = User(
+        id=uuid4(),
+        email='new@example.com',
+        password_hash='hashed-password',
+    )
+
+    with (
+        patch.object(
+            service.users,
+            'get_by_id',
+            new_callable=AsyncMock,
+            return_value=user,
+        ) as get_user,
+        patch(
+            'services.auth.verify_password',
+            return_value=True,
+        ) as verify_password_mock,
+        patch.object(
+            service.users,
+            'get_by_email',
+            new_callable=AsyncMock,
+            return_value=existing_user,
+        ) as get_by_email,
+    ):
+        with pytest.raises(UserAlreadyExistError):
+            await service.request_email_change(
+                user_id=user.id,
+                new_email='new@example.com',
+                password='password123',
+            )
+
+    get_user.assert_awaited_once_with(user.id)
+    verify_password_mock.assert_called_once_with(
+        'password123',
+        user.password_hash,
+    )
+    get_by_email.assert_awaited_once_with('new@example.com')
+    service.session.commit.assert_not_awaited()
+    service.email_publisher.publish_email_change.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_confirm_email_change(
+    email_change_service: EmailChangeService,
+    user: User,
+) -> None:
+    new_email = 'new@example.com'
+    code_id = uuid4()
+
+    email_change_code = EmailChangeCode(
+        id=code_id,
+        user_id=user.id,
+        new_email=new_email,
+        code_hash=b'code-hash',
+        expires_at=datetime.now(UTC) + timedelta(minutes=10),
+    )
+
+    with (
+        patch(
+            'services.verification_code.hash_secret',
+            return_value=b'code-hash',
+        ) as hash_secret_mock,
+        patch.object(
+            email_change_service.codes,
+            'get_valid_by_user_id',
+            new_callable=AsyncMock,
+            return_value=email_change_code,
+        ) as get_code,
+        patch.object(
+            email_change_service.users,
+            'get_by_id',
+            new_callable=AsyncMock,
+            return_value=user,
+        ) as get_user,
+        patch.object(
+            email_change_service.codes,
+            'mark_as_used',
+            new_callable=AsyncMock,
+        ) as mark_as_used,
+    ):
+        await email_change_service.confirm(
+            user_id=user.id,
+            code='123456',
+        )
+
+    hash_secret_mock.assert_called_once_with('123456')
+
+    get_code.assert_awaited_once_with(
+        user_id=user.id,
+        code_hash=b'code-hash',
+    )
+
+    get_user.assert_awaited_once_with(user.id)
+
+    assert user.email == new_email
+    assert user.is_email_verified is True
+
+    mark_as_used.assert_awaited_once_with(code_id)
+    email_change_service.session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_confirm_email_change_invalid_code(
+    email_change_service: EmailChangeService,
+    user: User,
+) -> None:
+    with (
+        patch(
+            'services.verification_code.hash_secret',
+            return_value=b'code-hash',
+        ) as hash_secret_mock,
+        patch.object(
+            email_change_service.codes,
+            'get_valid_by_user_id',
+            new_callable=AsyncMock,
+            return_value=None,
+        ) as get_code,
+        patch.object(
+            email_change_service.codes,
+            'mark_as_used',
+            new_callable=AsyncMock,
+        ) as mark_as_used,
+    ):
+        with pytest.raises(VerificationCodeInvalidError):
+            await email_change_service.confirm(
+                user_id=user.id,
+                code='123456',
+            )
+
+    hash_secret_mock.assert_called_once_with('123456')
+
+    get_code.assert_awaited_once_with(
+        user_id=user.id,
+        code_hash=b'code-hash',
+    )
+
+    email_change_service.session.commit.assert_not_awaited()
+    mark_as_used.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_confirm_email_change_user_not_found(
+    email_change_service: EmailChangeService,
+    user: User,
+) -> None:
+    email_change_code = EmailChangeCode(
+        id=uuid4(),
+        user_id=user.id,
+        new_email='new@example.com',
+        code_hash=b'code-hash',
+        expires_at=datetime.now(UTC) + timedelta(minutes=10),
+    )
+
+    with (
+        patch(
+            'services.verification_code.hash_secret',
+            return_value=b'code-hash',
+        ),
+        patch.object(
+            email_change_service.codes,
+            'get_valid_by_user_id',
+            new_callable=AsyncMock,
+            return_value=email_change_code,
+        ) as get_code,
+        patch.object(
+            email_change_service.codes,
+            'mark_as_used',
+            new_callable=AsyncMock,
+        ) as mark_as_used,
+        patch.object(
+            email_change_service.users,
+            'get_by_id',
+            new_callable=AsyncMock,
+            return_value=None,
+        ) as get_user,
+    ):
+        with pytest.raises(VerificationCodeInvalidError):
+            await email_change_service.confirm(
+                user_id=user.id,
+                code='123456',
+            )
+
+    get_code.assert_awaited_once_with(
+        user_id=user.id,
+        code_hash=b'code-hash',
+    )
+
+    get_user.assert_awaited_once_with(user.id)
+
+    email_change_service.session.commit.assert_not_awaited()
+    mark_as_used.assert_not_awaited()

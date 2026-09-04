@@ -11,7 +11,9 @@ from db.base import Base
 from models.refresh_token import RefreshToken  # ruff: ignore[unused-import]
 from models.user import User  # ruff: ignore[unused-import]
 from models.verification_code import (
+    EmailChangeCode,  # ruff: ignore[unused-import]
     EmailVerificationCode,  # ruff: ignore[unused-import]
+    PasswordResetCode,  # ruff: ignore[unused-import]
 )
 
 config = context.config

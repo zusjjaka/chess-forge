@@ -86,3 +86,19 @@ class PasswordChange(BaseModel):
             raise ValueError('Passwords do not match')
 
         return self
+
+
+class EmailChangeRequest(BaseModel):
+    new_email: EmailStr
+    password: str = Field(
+        min_length=8,
+        max_length=128,
+    )
+
+
+class EmailChangeConfirm(BaseModel):
+    code: str = Field(
+        min_length=6,
+        max_length=6,
+        pattern=r'^\d{6}$',
+    )

@@ -9,13 +9,20 @@ import pytest
 
 from models.user import User
 from models.verification_code import (
+    EmailChangeCode,
     EmailVerificationCode,
     PasswordResetCode,
 )
 from repositories.verification_code import (
+    EmailChangeCodeRepository,
     EmailVerificationCodeRepository,
     PasswordResetCodeRepository,
 )
+
+
+@pytest.fixture
+def email_change_repository(session) -> EmailChangeCodeRepository:
+    return EmailChangeCodeRepository(session=session)
 
 
 @pytest.fixture
@@ -259,3 +266,80 @@ async def test_password_reset_repository(
     await password_reset_repository.session.refresh(reset_code)
 
     assert reset_code.used_at is not None
+
+
+@pytest.mark.asyncio
+async def test_email_change_repository_create(
+    email_change_repository: EmailChangeCodeRepository,
+    user: User,
+) -> None:
+    code_hash = b'a' * 32
+    expires_at = datetime.now(UTC) + timedelta(minutes=15)
+    new_email = f'{uuid.uuid4()}@example.com'
+
+    email_change_code = await email_change_repository.create(
+        user_id=user.id,
+        new_email=new_email,
+        code_hash=code_hash,
+        expires_at=expires_at,
+    )
+
+    assert isinstance(email_change_code, EmailChangeCode)
+    assert email_change_code.id is not None
+    assert email_change_code.user_id == user.id
+    assert email_change_code.new_email == new_email
+    assert email_change_code.code_hash == code_hash
+    assert email_change_code.expires_at == expires_at
+    assert email_change_code.used_at is None
+
+
+@pytest.mark.asyncio
+async def test_email_change_repository_get_valid_by_user_id(
+    email_change_repository: EmailChangeCodeRepository,
+    user: User,
+) -> None:
+    code_hash = b'a' * 32
+    expires_at = datetime.now(UTC) + timedelta(minutes=15)
+    new_email = f'{uuid.uuid4()}@example.com'
+
+    email_change_code = await email_change_repository.create(
+        user_id=user.id,
+        new_email=new_email,
+        code_hash=code_hash,
+        expires_at=expires_at,
+    )
+
+    result = await email_change_repository.get_valid_by_user_id(
+        user_id=user.id,
+        code_hash=code_hash,
+    )
+
+    assert result is email_change_code
+    assert result.new_email == new_email
+
+
+@pytest.mark.asyncio
+async def test_email_change_repository_mark_as_used(
+    email_change_repository: EmailChangeCodeRepository,
+    user: User,
+) -> None:
+    code_hash = b'a' * 32
+    expires_at = datetime.now(UTC) + timedelta(minutes=15)
+    new_email = f'{uuid.uuid4()}@example.com'
+
+    email_change_code = await email_change_repository.create(
+        user_id=user.id,
+        new_email=new_email,
+        code_hash=code_hash,
+        expires_at=expires_at,
+    )
+
+    assert email_change_code.used_at is None
+
+    await email_change_repository.mark_as_used(
+        email_change_code.id,
+    )
+
+    await email_change_repository.session.refresh(email_change_code)
+
+    assert email_change_code.used_at is not None

@@ -14,6 +14,26 @@ class EmailPublisher:
     def __init__(self, rabbitmq: RabbitmqClient) -> None:
         self.rabbitmq = rabbitmq
 
+    async def _publish(self,
+                       msg_id: uuid.UUID,
+                       msg_type: EmailMessageType,
+                       usr_email: str,
+                       data: dict[str, str]
+                       ) -> None:
+        message: EmailMessage = EmailMessage(
+            type=msg_type,
+            to=usr_email,
+            data=data,
+            message_id=msg_id,
+            version=1
+        )
+
+        await self.rabbitmq.publish(
+            message=message.model_dump_json().encode(),
+            exchange=self.EXCHANGE,
+            routing_key=self.ROUTING_KEY,
+        )
+
     async def publish_email_verification(self,
                                          email: str,
                                          code: str,
@@ -38,22 +58,14 @@ class EmailPublisher:
             data={'code': code},
         )
 
-    async def _publish(self,
-                       msg_id: uuid.UUID,
-                       msg_type: EmailMessageType,
-                       usr_email: str,
-                       data: dict[str, str]
-                       ) -> None:
-        message: EmailMessage = EmailMessage(
-            type=msg_type,
-            to=usr_email,
-            data=data,
-            message_id=msg_id,
-            version=1
-        )
-
-        await self.rabbitmq.publish(
-            message=message.model_dump_json().encode(),
-            exchange=self.EXCHANGE,
-            routing_key=self.ROUTING_KEY,
+    async def publish_email_change(self,
+                                   email: str,
+                                   code: str,
+                                   message_id: uuid.UUID
+                                   ) -> None:
+        await self._publish(
+            msg_id=message_id,
+            msg_type='email.change',
+            usr_email=email,
+            data={'code': code},
         )

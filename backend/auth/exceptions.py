@@ -15,7 +15,7 @@ class APIException(Exception):
 class UserAlreadyExistError(APIException):
     """User with the given email already exists."""
 
-    detail = 'Пользователь с почтой {email} уже существует'
+    detail = 'User with email {email} is already exists'
     status_code = status.HTTP_409_CONFLICT
 
 
@@ -72,4 +72,11 @@ class PasswordInvalidError(APIException):
     """Current password is invalid."""
 
     detail = 'Current password is invalid'
+    status_code = status.HTTP_400_BAD_REQUEST
+
+
+class EmailSameError(APIException):
+    """New email is the same as old one."""
+
+    detail = 'New email is the same as the current email'
     status_code = status.HTTP_400_BAD_REQUEST

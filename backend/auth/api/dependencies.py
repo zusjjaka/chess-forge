@@ -22,6 +22,7 @@ from publishers.email import EmailPublisher
 from repositories.user import UserRepository
 from services.auth import AuthService
 from services.verification_code import (
+    EmailChangeService,
     EmailVerificationService,
     PasswordResetService,
 )
@@ -76,3 +77,8 @@ def get_email_verification_service(session: AsyncSession = Depends(get_db_sessio
 def get_password_reset_service(session: AsyncSession = Depends(get_db_session)
                                ) -> PasswordResetService:
     return PasswordResetService(session=session)
+
+
+def get_email_change_service(session: AsyncSession = Depends(get_db_session)
+                             ) -> EmailChangeService:
+    return EmailChangeService(session=session)

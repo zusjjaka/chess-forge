@@ -6,6 +6,8 @@ from pydantic import ValidationError
 
 from schemas.auth import (
     EmailApprovalRequest,
+    EmailChangeConfirm,
+    EmailChangeRequest,
     LoginRequest,
     PasswordResetConfirm,
     PasswordResetRequest,
@@ -397,3 +399,60 @@ class TestPasswordResetConfirm:
                 password='password123',
                 password_repeat='password456',
             )
+
+
+class TestEmailChangeRequest:
+    def test_valid_data(self) -> None:
+        data = EmailChangeRequest(
+            new_email='new@example.com',
+            password='password123',
+        )
+
+        assert data.new_email == 'new@example.com'
+        assert data.password == 'password123'
+
+    def test_invalid_email(self) -> None:
+        with pytest.raises(ValidationError):
+            EmailChangeRequest(
+                new_email='not-an-email',
+                password='password123',
+            )
+
+    def test_password_too_short(self) -> None:
+        with pytest.raises(ValidationError):
+            EmailChangeRequest(
+                new_email='new@example.com',
+                password='short',
+            )
+
+    def test_password_too_long(self) -> None:
+        password = 'a' * 129
+
+        with pytest.raises(ValidationError):
+            EmailChangeRequest(
+                new_email='new@example.com',
+                password=password,
+            )
+
+
+class TestEmailChangeConfirm:
+    def test_valid_code(self) -> None:
+        data = EmailChangeConfirm(code='123456')
+
+        assert data.code == '123456'
+
+    def test_code_too_short(self) -> None:
+        with pytest.raises(ValidationError):
+            EmailChangeConfirm(code='12345')
+
+    def test_code_too_long(self) -> None:
+        with pytest.raises(ValidationError):
+            EmailChangeConfirm(code='1234567')
+
+    def test_code_must_contain_only_digits(self) -> None:
+        with pytest.raises(ValidationError):
+            EmailChangeConfirm(code='12345a')
+
+    def test_code_must_not_contain_spaces(self) -> None:
+        with pytest.raises(ValidationError):
+            EmailChangeConfirm(code='123 56')

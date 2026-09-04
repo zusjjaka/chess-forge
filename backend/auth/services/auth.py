@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import get_settings
 from exceptions import (
+    EmailSameError,
     InvalidCredentialsError,
     PasswordInvalidError,
     RefreshTokenExpiredError,
@@ -21,6 +22,7 @@ from publishers.email import EmailPublisher
 from repositories.refresh_token import RefreshTokenRepository
 from repositories.user import UserRepository
 from repositories.verification_code import (
+    EmailChangeCodeRepository,
     EmailVerificationCodeRepository,
     PasswordResetCodeRepository,
 )
@@ -43,6 +45,7 @@ class AuthService:
         self.users = UserRepository(session)
         self.refresh_tokens = RefreshTokenRepository(session)
         self.email_codes = EmailVerificationCodeRepository(session=session)
+        self.email_change_codes = EmailChangeCodeRepository(session=session)
         self.passw_codes = PasswordResetCodeRepository(session=session)
         self.email_publisher = email_publisher
         self.session = session
@@ -220,3 +223,44 @@ class AuthService:
         user.password_hash = hash_password(new_password)
 
         await self.session.commit()
+
+
+    async def request_email_change(self,
+                                user_id: uuid.UUID,
+                                new_email: str,
+                                password: str
+                                ) -> None:
+        user = await self.users.get_by_id(user_id)
+
+        if user is None:
+            raise PasswordInvalidError
+
+        if not verify_password(password, user.password_hash):
+            raise PasswordInvalidError
+
+        if user.email == new_email:
+            raise EmailSameError
+
+        existing_user = await self.users.get_by_email(new_email)
+
+        if existing_user is not None:
+            raise UserAlreadyExistError(email=new_email)
+
+        code = generate_verification_code()
+        code_hash = hash_secret(code)
+        now = datetime.now(UTC)
+
+        email_change_code = await self.email_change_codes.create(
+            user_id=user.id,
+            new_email=new_email,
+            code_hash=code_hash,
+            expires_at=now + settings.verification_code_lifetime,
+        )
+
+        await self.session.commit()
+
+        await self.email_publisher.publish_email_change(
+            email=new_email,
+            code=code,
+            message_id=email_change_code.id,
+        )
