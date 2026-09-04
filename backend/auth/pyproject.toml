@@ -1,10 +1,21 @@
 [project]
-name = "chess-forge"
+name = "auth-service"
 version = "0.1.0"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    "fastapi>=0.141.1",
+    "alembic>=1.19.1",
+    "argon2-cffi>=25.1.0",
+    "asyncpg>=0.31.0",
+    "cryptography>=50.0.0",
+    "email-validator>=2.3.0",
+    "fastapi[standard]>=0.141.1",
     "pydantic>=2.13.4",
+    "pydantic-settings>=2.15.0",
+    "pyjwt>=2.13.0",
+    "sqlalchemy>=2.0.52",
+    "psycopg[binary]>=3.3.4",
+    "mypy>=2.3.1",
+    "aio-pika>=10.0.1",
 ]
 
 [dependency-groups]
@@ -12,17 +23,28 @@ dev = [
     "mypy",
     "pre-commit",
     "pytest",
+    "pytest-asyncio>=1.4.0",
     "ruff",
 ]
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
 testpaths = ["tests"]
-pythonpath = ["src"]
+
+
+# =========================
+# Ruff
+# =========================
 
 [tool.ruff]
-include = [
-    "*.py",
+include = ["*.py"]
+exclude = [
+    "tests",
+    "alembic/versions",
 ]
+force-exclude = true
+
 preview = true
 line-length = 88
 indent-width = 4
@@ -48,15 +70,20 @@ select = [
     "RET",
     "RSE",
     "PIE",
-    "ERA",
     "ARG",
     "T10",
     "T20",
     "FIX",
     "RUF",
 ]
+
 dummy-variable-rgx = "^(_.*|args|kwargs)$"
+
 ignore = [
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    "B008",
     "unnecessary-assign",
     "bad-quotes-multiline-string",
 ]
@@ -74,14 +101,23 @@ avoid-escape = true
 convention = "pep257"
 
 [tool.ruff.lint.isort]
-known-first-party = ["src"]
+known-first-party = ["."]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**" = ["T201"]
+
+
+# =========================
+# Mypy
+# =========================
 
 [tool.mypy]
 python_version = "3.13"
 
+exclude = '(^|/)tests/|(^|/)alembic/versions/|(^|/)\.venv/'
+
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
-
 disallow_any_generics = true
 
 no_implicit_optional = true
@@ -96,10 +132,3 @@ warn_redundant_casts = true
 warn_unused_configs = true
 
 disallow_untyped_decorators = false
-
-[[tool.mypy.overrides]]
-module = ["tests.*"]
-
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-disallow_any_generics = false

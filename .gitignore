@@ -32,3 +32,5 @@ logs/
 .vscode/
 
 docker-compose.override.yml
+
+**/keys/private_key.pem

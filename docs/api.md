@@ -28,15 +28,16 @@
 │   ├── <a href="#post-apiv1authregister">register</a>
 │   ├── <a href="#post-apiv1authlogin">login</a>
 │   ├── <a href="#post-apiv1authlogout">logout</a>
+│   ├── <a href="#post-apiv1authlogout-all">logout-all</a>
 │   ├── tokens/
-│   │   ├── <a href="#post-apiv1authtokensapproval">approval</a>
 │   │   └── <a href="#post-apiv1authtokensrefresh">refresh</a>
 │   ├── password/
 │   │   ├── <a href="#post-apiv1authpasswordresetrequest">reset/request</a>
 │   │   ├── <a href="#post-apiv1authpasswordresetconfirm">reset/confirm</a>
 │   │   └── <a href="#post-apiv1authpasswordchange">change</a>
 │   ├── email/
-│   │   ├── <a href="#post-apiv1authemailchange">change</a>
+│   │   ├── <a href="#post-apiv1authemailapproval">approval</a>
+│   │   ├── <a href="#post-apiv1authemailchangerequest">change/request</a>
 │   │   └── <a href="#post-apiv1authemailchangeconfirm">change/confirm</a>
 │   └── <a href="#get-apiv1authme">me</a>
 │
@@ -117,37 +118,33 @@
 
 ### `POST /api/v1/auth/logout`
 
-Делает все refresh токены пользователя неактивными.
+Завершает текущую сессию пользователя.
+
+Текущий refresh token становится неактивным и больше не может использоваться для получения новой пары токенов.
+
 Текущий access token остаётся действительным до истечения срока действия.
-В обычных условиях access токен теряется при перенаправлении на домашнюю страницу сайта.
 
 **Input**
 
-Access токен передается через заголовок Authorization: 'Bearer \<access-token\>'
+Refresh token передается серверу через HttpOnly, Secure, SameSite: Strict cookie.
 
 **Output — `204 No Content`**
 
 ---
 
-### `POST /api/v1/auth/tokens/approval`
+### `POST /api/v1/auth/logout-all`
 
-Подтверждение почты через отправленный код
+Завершает все активные сессии пользователя.
+
+Все refresh токены пользователя становятся неактивными и больше не могут использоваться для получения новых access токенов.
+
+Текущий access token и другие уже выданные access токены остаются действительными до истечения срока действия.
 
 **Input**
 
-```json
-{
-  "code": "123456"
-}
-```
+Refresh token передается серверу через HttpOnly, Secure, SameSite: Strict cookie.
 
-**Output — `200 OK`**
-
-```json
-{
-  "status": "approved"
-}
-```
+**Output — `204 No Content`**
 
 ---
 
@@ -187,12 +184,6 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 **Output — `202 Accepted`**
 
-```json
-{
-  "status": "email_sent"
-}
-```
-
 Сервис отправляет на почту код для подтверждения.
 
 ---
@@ -205,6 +196,7 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 ```json
 {
+  "email": "user@example.com",
   "code": "123456",
   "password": "string",
   "password_repeat": "string"
@@ -235,7 +227,23 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 ## Email
 
-### `POST /api/v1/auth/email/change`
+### `POST /api/v1/auth/email/approval`
+
+Подтверждение почты через отправленный код
+
+**Input**
+
+```json
+{
+  "code": "123456"
+}
+```
+
+**Output — `204 No Content`**
+
+---
+
+### `POST /api/v1/auth/email/change/request`
 
 Запрос на смену почты.
 
@@ -249,12 +257,6 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 ```
 
 **Output — `202 Accepted`**
-
-```json
-{
-  "status": "verification_sent"
-}
-```
 
 Письмо с кодом подтверждения отправлено на почту.
 
@@ -284,11 +286,19 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 **Input**
 
+Нет.
+
 **Output — `200 OK`**
 
 ```json
 {
   "email": "user@example.com",
+  "display_name": "string",
+  "gender": "M",
+  "country": "KZ",
+  "birth_date": "2000-01-01",
+  "bio": "string",
+  "telegram_alias": "username",
   "created_at": "2026-01-01T12:00:00Z"
 }
 ```
@@ -309,12 +319,35 @@ Refresh token устанавливается сервером в HttpOnly, Secur
 
 Все поля опциональные.
 
+Ограничения:
+
+- display_name - от 1 до 25 символов.
+
+- gender - M или F.
+
+- country - двухбуквенный код страны в формате ISO 3166-1 alpha-2.
+
+- birth_date - дата рождения; допускается возраст примерно от 6 до 100 лет.
+
+- bio - от 1 до 75 символов.
+
+- telegram_alias - от 5 до 32 символов, начинается с буквы и содержит только латинские буквы, цифры и _.
+
+- null можно передать для очистки значения.
+
+- Если поле не передано, его значение не изменяется.
+
 **Output — `200 OK`**
 
 ```json
 {
   "email": "user@example.com",
   "display_name": "string",
+  "gender": "M",
+  "country": "KZ",
+  "birth_date": "2000-01-01",
+  "bio": "string",
+  "telegram_alias": "username",
   "created_at": "2026-01-01T12:00:00Z"
 }
 ```

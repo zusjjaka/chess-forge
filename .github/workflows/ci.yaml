@@ -6,7 +6,50 @@ on:
 
 jobs:
   quality:
+    if: always()
+    needs:
+      - quality-auth
+      - quality-email-sender
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Check quality jobs
+        run: |
+          if [ "${{ needs.quality-auth.result }}" != "success" ] ||
+             [ "${{ needs.quality-email-sender.result }}" != "success" ]; then
+            exit 1
+          fi
+
+  quality-auth:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: auth_test
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: auth_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U auth_test -d auth_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      rabbitmq:
+        image: rabbitmq:4.2
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://auth_test:root@localhost:5432/auth_test
 
     steps:
       - name: Checkout
@@ -19,16 +62,68 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
+        working-directory: backend/auth
         run: uv sync --locked
 
       - name: Ruff
-        run: |
-          uv run ruff check
-          uv run ruff format --check
+        working-directory: backend/auth
+        run: uv run ruff check
 
-      # - name: Mypy
-      #   run: uv run mypy src
+      - name: Mypy
+        working-directory: backend/auth
+        run: uv run mypy .
 
-      # - name: Pytest
-      #   run: uv run pytest
-  
+      - name: Generate JWT keys
+        working-directory: backend/auth
+        run: uv run python ../../scripts/generate_keys.py
+
+      - name: Run migrations
+        working-directory: backend/auth
+        env:
+          DATABASE__URL: postgresql+psycopg://auth_test:root@localhost:5432/auth_test
+          RABBITMQ__URL: amqp://guest:guest@localhost:5672//
+        run: uv run alembic upgrade head
+
+      - name: Pytest
+        working-directory: backend/auth
+        env:
+          DATABASE__URL: postgresql+psycopg://auth_test:root@localhost:5432/auth_test
+          RABBITMQ__URL: amqp://guest:guest@localhost:5672//
+        run: uv run pytest
+
+  quality-email-sender:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        working-directory: backend/email_sender
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        working-directory: backend/email_sender
+        run: uv sync --locked
+
+      - name: Ruff
+        working-directory: backend/email_sender
+        run: uv run ruff check
+
+      - name: Mypy
+        working-directory: backend/email_sender
+        run: uv run mypy .
+
+      - name: Pytest
+        working-directory: backend/email_sender
+        env:
+          SMTP_HOST: localhost
+          SMTP_PORT: 587
+          SMTP_USERNAME: test
+          SMTP_PASSWORD: test
+          FROM_EMAIL: test@example.com
+          RABBITMQ__URL: amqp://guest:guest@localhost:5672//
+        run: uv run pytest
