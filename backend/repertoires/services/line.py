@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from domains.chess_validator import ChessValidator
 from exceptions import (
+    InvalidLineMovesError,
     LineNotFoundError,
     ParentLineMovesUpdateError,
     RepertoireNotFoundError,
@@ -87,45 +88,72 @@ class LineService:
     def _validate_move_count(
             moves: list[str],
             side: RepertoireSide,
+            is_root: bool,
             ) -> None:
-        if side == RepertoireSide.WHITE and len(moves) % 2 == 0:
+        if is_root:
+            if side == RepertoireSide.WHITE and len(moves) % 2 == 0:
+                raise ValueError(
+                    'White repertoire root must contain an odd number of moves.',
+                )
+
+            if side == RepertoireSide.BLACK and len(moves) % 2 != 0:
+                raise ValueError(
+                    'Black repertoire root must contain an even number of moves.',
+                )
+
+            return
+
+        if len(moves) % 2 != 0:
             raise ValueError(
-                'White repertoire line must contain an odd number of moves.',
+                'Non-root line must contain an even number of moves.',
             )
 
-        if side == RepertoireSide.BLACK and len(moves) % 2 != 0:
-            raise ValueError(
-                'Black repertoire line must contain an even number of moves.',
+    def _validate_moves(
+            self,
+            board: chess.Board,
+            moves: list[str],
+            side: RepertoireSide,
+            is_root: bool,
+            ) -> None:
+        try:
+            self._validate_move_count(
+                moves,
+                side,
+                is_root,
             )
+
+            self.chess_validator.validate_moves(
+                board,
+                moves,
+            )
+        except ValueError as error:
+            raise InvalidLineMovesError from error
 
     async def _validate_line_moves(
             self,
             repertoire_side: RepertoireSide,
             repertoire_id: uuid.UUID,
-            line_id: uuid.UUID,
+            line: Line,
             moves: list[str],
             ) -> None:
         path = await self.line_repository.get_path_to_root(
-            line_id,
+            line.id,
             repertoire_id,
         )
 
         board = chess.Board()
 
-        for line in path[:-1]:
+        for current_line in path[:-1]:
             self.chess_validator.apply_persisted_moves(
                 board,
-                line.moves,
+                current_line.moves,
             )
 
-        self._validate_move_count(
-            moves,
-            repertoire_side,
-        )
-
-        self.chess_validator.validate_moves(
+        self._validate_moves(
             board,
             moves,
+            repertoire_side,
+            line.parent_id is None,
         )
 
     def _validate_tree(
@@ -133,17 +161,15 @@ class LineService:
             node: LineTreeReplace,
             board: chess.Board,
             side: RepertoireSide,
+            is_root: bool,
             ) -> None:
-        self._validate_move_count(
-            node.moves,
-            side,
-        )
-
         current_board = board.copy()
 
-        self.chess_validator.validate_moves(
+        self._validate_moves(
             current_board,
             node.moves,
+            side,
+            is_root,
         )
 
         for child in node.children:
@@ -151,6 +177,7 @@ class LineService:
                 child,
                 current_board,
                 side,
+                False,
             )
 
     async def get_tree(
@@ -255,12 +282,12 @@ class LineService:
                 parent_id,
             )
 
-            board = chess.Board()
-
             path = await self.line_repository.get_path_to_root(
                 parent.id,
                 repertoire_id,
             )
+
+            board = chess.Board()
 
             for line in path:
                 self.chess_validator.apply_persisted_moves(
@@ -268,14 +295,11 @@ class LineService:
                     line.moves,
                 )
 
-            self._validate_move_count(
-                data.moves,
-                repertoire.side,
-            )
-
-            self.chess_validator.validate_moves(
+            self._validate_moves(
                 board,
                 data.moves,
+                repertoire.side,
+                False,
             )
 
             line = Line(
@@ -328,7 +352,7 @@ class LineService:
                 await self._validate_line_moves(
                     repertoire.side,
                     repertoire_id,
-                    line.id,
+                    line,
                     fields['moves'],
                 )
 
@@ -383,6 +407,7 @@ class LineService:
             data.tree,
             chess.Board(),
             repertoire.side,
+            True,
         )
 
         async with self.session.begin():
@@ -402,26 +427,40 @@ class LineService:
             )
 
             if root is None:
-                raise LineNotFoundError
+                root = Line(
+                    repertoire_id=repertoire_id,
+                    parent_id=None,
+                    tag=data.tree.tag,
+                    moves=data.tree.moves,
+                )
 
-            existing_lines = await self.line_repository.get_all_by_repertoire(
-                repertoire_id,
-            )
+                await self.line_repository.create(root)
 
-            for line in existing_lines:
-                if line.id != root.id:
-                    await self.session.delete(line)
+                await self._create_children_recursive(
+                    repertoire_id,
+                    root.id,
+                    data.tree.children,
+                )
 
-            root.tag = data.tree.tag
-            root.moves = data.tree.moves
+            else:
+                existing_lines = await self.line_repository.get_all_by_repertoire(
+                    repertoire_id,
+                )
 
-            await self.session.flush()
+                for line in existing_lines:
+                    if line.id != root.id:
+                        await self.session.delete(line)
 
-            await self._create_children_recursive(
-                repertoire_id,
-                root.id,
-                data.tree.children,
-            )
+                root.tag = data.tree.tag
+                root.moves = data.tree.moves
+
+                await self.session.flush()
+
+                await self._create_children_recursive(
+                    repertoire_id,
+                    root.id,
+                    data.tree.children,
+                )
 
             repertoire.version += 1
 

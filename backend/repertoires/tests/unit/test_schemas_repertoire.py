@@ -16,19 +16,16 @@ class TestRepertoireCreate:
             name='Italian Game',
             description='White repertoire',
             side=RepertoireSide.WHITE,
-            root_moves=['e2e4'],
         )
 
         assert data.name == 'Italian Game'
         assert data.description == 'White repertoire'
         assert data.side == RepertoireSide.WHITE
-        assert data.root_moves == ['e2e4']
 
     def test_description_defaults_to_empty_string(self) -> None:
         data = RepertoireCreate(
             name='Italian Game',
             side=RepertoireSide.WHITE,
-            root_moves=['e2e4'],
         )
 
         assert data.description == ''
@@ -37,7 +34,6 @@ class TestRepertoireCreate:
         data = RepertoireCreate(
             name='a',
             side=RepertoireSide.WHITE,
-            root_moves=['e2e4'],
         )
 
         assert data.name == 'a'
@@ -47,14 +43,12 @@ class TestRepertoireCreate:
             RepertoireCreate(
                 name='',
                 side=RepertoireSide.WHITE,
-                root_moves=['e2e4'],
             )
 
     def test_name_max_length(self) -> None:
         data = RepertoireCreate(
             name='a' * 40,
             side=RepertoireSide.WHITE,
-            root_moves=['e2e4'],
         )
 
         assert len(data.name) == 40
@@ -64,15 +58,6 @@ class TestRepertoireCreate:
             RepertoireCreate(
                 name='a' * 41,
                 side=RepertoireSide.WHITE,
-                root_moves=['e2e4'],
-            )
-
-    def test_root_moves_cannot_be_empty(self) -> None:
-        with pytest.raises(ValidationError):
-            RepertoireCreate(
-                name='Italian Game',
-                side=RepertoireSide.WHITE,
-                root_moves=[],
             )
 
     @pytest.mark.parametrize(
@@ -89,7 +74,6 @@ class TestRepertoireCreate:
         data = RepertoireCreate(
             name='Repertoire',
             side=side,
-            root_moves=['e2e4'],
         )
 
         assert data.side == side
@@ -99,22 +83,12 @@ class TestRepertoireCreate:
             RepertoireCreate(
                 name='Repertoire',
                 side='invalid',
-                root_moves=['e2e4'],
-            )
-
-    def test_invalid_root_move(self) -> None:
-        with pytest.raises(ValidationError):
-            RepertoireCreate(
-                name='Repertoire',
-                side=RepertoireSide.WHITE,
-                root_moves=['invalid'],
             )
 
     def test_name_whitespace_is_stripped(self) -> None:
         data = RepertoireCreate(
             name='  Italian Game  ',
             side=RepertoireSide.WHITE,
-            root_moves=['e2e4'],
         )
 
         assert data.name == 'Italian Game'
@@ -124,7 +98,6 @@ class TestRepertoireCreate:
             name='Italian Game',
             description='  White repertoire  ',
             side=RepertoireSide.WHITE,
-            root_moves=['e2e4'],
         )
 
         assert data.description == 'White repertoire'

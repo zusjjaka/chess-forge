@@ -8,7 +8,6 @@ from pydantic import (
 )
 
 from models.repertoire import RepertoireSide
-from schemas.line import UCIMove
 
 
 class RepertoireCreate(BaseModel):
@@ -18,9 +17,6 @@ class RepertoireCreate(BaseModel):
     )
     description: str = ''
     side: RepertoireSide
-    root_moves: list[UCIMove] = Field(
-        min_length=1,
-    )
 
     model_config = ConfigDict(
         str_strip_whitespace=True,

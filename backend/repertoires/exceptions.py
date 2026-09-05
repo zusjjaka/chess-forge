@@ -47,6 +47,13 @@ class ParentLineMovesUpdateError(APIException):
     status_code = status.HTTP_400_BAD_REQUEST
 
 
+class InvalidLineMovesError(APIException):
+    """Line moves are invalid."""
+
+    detail = 'Invalid line moves'
+    status_code = status.HTTP_400_BAD_REQUEST
+
+
 class RepertoireVersionConflictError(APIException):
     """Repertoire version conflict."""
 

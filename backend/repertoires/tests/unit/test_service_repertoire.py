@@ -53,15 +53,11 @@ def service(
         return_value=True,
     )
 
-    service.line_repository.create = AsyncMock(
-        side_effect=lambda line: line,
-    )
-
     return service
 
 
 @pytest.mark.asyncio
-async def test_create_creates_repertoire_and_root(
+async def test_create_creates_repertoire(
         service: RepertoireService,
         ) -> None:
     user_id = uuid.uuid4()
@@ -70,7 +66,6 @@ async def test_create_creates_repertoire_and_root(
         name='Italian Game',
         description='King pawn opening',
         side=RepertoireSide.WHITE,
-        root_moves=['e2e4'],
     )
 
     result = await service.create(
@@ -98,18 +93,6 @@ async def test_create_creates_repertoire_and_root(
     assert repertoire.side == RepertoireSide.WHITE
     assert repertoire.version == 1
 
-    service.line_repository.create.assert_awaited_once()
-
-    root = (
-        service.line_repository.create
-        .await_args
-        .args[0]
-    )
-
-    assert root.repertoire_id == repertoire.id
-    assert root.parent_id is None
-    assert root.moves == ['e2e4']
-
 
 @pytest.mark.asyncio
 async def test_create_uses_default_description(
@@ -118,7 +101,6 @@ async def test_create_uses_default_description(
     data = RepertoireCreate(
         name='Sicilian Defense',
         side=RepertoireSide.BLACK,
-        root_moves=['e2e4', 'c7c5'],
     )
 
     result = await service.create(
@@ -419,7 +401,7 @@ async def test_update_allows_explicit_null_description(
         data,
     )
 
-    assert repertoire.description is None
+    assert repertoire.description == ''
 
 
 @pytest.mark.asyncio

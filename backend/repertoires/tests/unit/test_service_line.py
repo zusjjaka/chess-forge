@@ -5,6 +5,7 @@ import chess
 import pytest
 
 from exceptions import (
+    InvalidLineMovesError,
     LineNotFoundError,
     ParentLineMovesUpdateError,
     RepertoireNotFoundError,
@@ -172,33 +173,54 @@ async def test_get_line_raises_when_missing(
         )
 
 
-def test_validate_move_count_accepts_odd_white_line() -> None:
+def test_validate_move_count_accepts_odd_white_root() -> None:
     LineService._validate_move_count(
         ['e2e4'],
         RepertoireSide.WHITE,
+        True,
     )
 
 
-def test_validate_move_count_accepts_even_black_line() -> None:
+def test_validate_move_count_accepts_even_black_root() -> None:
     LineService._validate_move_count(
-        ['e2e4', 'e7e5'],
+        ['e2e4', 'c7c5'],
         RepertoireSide.BLACK,
+        True,
     )
 
 
-def test_validate_move_count_rejects_even_white_line() -> None:
+def test_validate_move_count_accepts_even_non_root_line() -> None:
+    LineService._validate_move_count(
+        ['e7e5', 'g1f3'],
+        RepertoireSide.WHITE,
+        False,
+    )
+
+
+def test_validate_move_count_rejects_even_white_root() -> None:
     with pytest.raises(ValueError):
         LineService._validate_move_count(
             ['e2e4', 'e7e5'],
             RepertoireSide.WHITE,
+            True,
         )
 
 
-def test_validate_move_count_rejects_odd_black_line() -> None:
+def test_validate_move_count_rejects_odd_black_root() -> None:
     with pytest.raises(ValueError):
         LineService._validate_move_count(
             ['e2e4'],
             RepertoireSide.BLACK,
+            True,
+        )
+
+
+def test_validate_move_count_rejects_odd_non_root_line() -> None:
+    with pytest.raises(ValueError):
+        LineService._validate_move_count(
+            ['e7e5'],
+            RepertoireSide.WHITE,
+            False,
         )
 
 
@@ -209,7 +231,7 @@ def test_validate_tree_accepts_valid_white_tree(
         moves=['e2e4'],
         children=[
             LineTreeReplace(
-                moves=['e7e5', 'g1f3', 'b8c6'],
+                moves=['e7e5', 'g1f3'],
             ),
         ],
     )
@@ -218,6 +240,7 @@ def test_validate_tree_accepts_valid_white_tree(
         tree,
         chess.Board(),
         RepertoireSide.WHITE,
+        True,
     )
 
 
@@ -237,6 +260,7 @@ def test_validate_tree_accepts_valid_black_tree(
         tree,
         chess.Board(),
         RepertoireSide.BLACK,
+        True,
     )
 
 
@@ -247,11 +271,12 @@ def test_validate_tree_rejects_illegal_move(
         moves=['e2e5'],
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidLineMovesError):
         service._validate_tree(
             tree,
             chess.Board(),
             RepertoireSide.WHITE,
+            True,
         )
 
 
@@ -262,11 +287,12 @@ def test_validate_tree_rejects_wrong_move_count(
         moves=['e2e4', 'e7e5'],
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidLineMovesError):
         service._validate_tree(
             tree,
             chess.Board(),
             RepertoireSide.WHITE,
+            True,
         )
 
 
@@ -277,7 +303,7 @@ def test_validate_tree_validates_child_from_parent_position(
         moves=['e2e4'],
         children=[
             LineTreeReplace(
-                moves=['e7e5', 'g1f3', 'b8c6'],
+                moves=['e7e5', 'g1f3'],
             ),
         ],
     )
@@ -286,6 +312,7 @@ def test_validate_tree_validates_child_from_parent_position(
         tree,
         chess.Board(),
         RepertoireSide.WHITE,
+        True,
     )
 
 
@@ -346,7 +373,7 @@ async def test_get_tree_response_builds_tree(
         id=uuid.uuid4(),
         repertoire_id=repertoire.id,
         parent_id=child.id,
-        moves=['b8c6'],
+        moves=['b8c6', 'f1c4'],
     )
 
     service.repertoire_repository.get_by_id_for_user = AsyncMock(
@@ -381,7 +408,7 @@ async def test_get_tree_response_builds_tree(
                     {
                         'id': grandchild.id,
                         'tag': None,
-                        'moves': ['b8c6'],
+                        'moves': ['b8c6', 'f1c4'],
                         'children': [],
                     },
                 ],
@@ -407,7 +434,7 @@ async def test_get_line_response_returns_subtree(
         id=uuid.uuid4(),
         repertoire_id=repertoire.id,
         parent_id=child.id,
-        moves=['b8c6'],
+        moves=['b8c6', 'f1c4'],
     )
 
     service.repertoire_repository.get_by_id_for_user = AsyncMock(
@@ -438,7 +465,7 @@ async def test_get_line_response_returns_subtree(
             {
                 'id': grandchild.id,
                 'tag': None,
-                'moves': ['b8c6'],
+                'moves': ['b8c6', 'f1c4'],
                 'children': [],
             },
         ],
@@ -463,7 +490,7 @@ async def test_create_child_creates_line_and_increments_version(
 
     data = LineCreate(
         tag='Main line',
-        moves=['e7e5', 'g1f3', 'b8c6'],
+        moves=['e7e5', 'g1f3'],
     )
 
     result = await service.create_child(
@@ -476,7 +503,7 @@ async def test_create_child_creates_line_and_increments_version(
     assert result.repertoire_id == repertoire.id
     assert result.parent_id == root.id
     assert result.tag == 'Main line'
-    assert result.moves == ['e7e5', 'g1f3', 'b8c6']
+    assert result.moves == ['e7e5', 'g1f3']
     assert repertoire.version == 2
 
     service.line_repository.create.assert_awaited_once()
@@ -490,7 +517,7 @@ async def test_create_child_creates_line_and_increments_version(
     assert created_line.parent_id == root.id
     assert created_line.repertoire_id == repertoire.id
     assert created_line.tag == 'Main line'
-    assert created_line.moves == ['e7e5', 'g1f3', 'b8c6']
+    assert created_line.moves == ['e7e5', 'g1f3']
 
 
 @pytest.mark.asyncio
@@ -530,7 +557,7 @@ async def test_create_child_rejects_illegal_moves(
         return_value=[root],
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidLineMovesError):
         await service.create_child(
             repertoire.id,
             root.id,
@@ -560,13 +587,13 @@ async def test_create_child_rejects_wrong_move_count(
         return_value=[root],
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidLineMovesError):
         await service.create_child(
             repertoire.id,
             root.id,
             repertoire.user_id,
             LineCreate(
-                moves=['e7e5', 'g1f3'],
+                moves=['e7e5'],
             ),
         )
 
@@ -687,7 +714,7 @@ async def test_update_rejects_illegal_leaf_moves(
         return_value=[root],
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidLineMovesError):
         await service.update(
             repertoire.id,
             root.id,
@@ -810,7 +837,7 @@ async def test_replace_tree_replaces_existing_children(
         children=[
             LineTreeReplace(
                 tag='New child',
-                moves=['d7d5'],
+                moves=['d7d5', 'c2c4'],
             ),
         ],
     )
@@ -857,7 +884,7 @@ async def test_replace_tree_replaces_existing_children(
 
     assert created_child.parent_id == root.id
     assert created_child.tag == 'New child'
-    assert created_child.moves == ['d7d5']
+    assert created_child.moves == ['d7d5', 'c2c4']
 
 
 @pytest.mark.asyncio
@@ -932,7 +959,7 @@ async def test_replace_tree_rejects_invalid_tree_before_transaction(
         ),
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidLineMovesError):
         await service.replace_tree(
             repertoire.id,
             repertoire.user_id,
@@ -945,7 +972,7 @@ async def test_replace_tree_rejects_invalid_tree_before_transaction(
 
 
 @pytest.mark.asyncio
-async def test_replace_tree_raises_when_root_missing(
+async def test_replace_tree_creates_root_when_root_missing(
         service: LineService,
         repertoire: Repertoire,
         ) -> None:
@@ -962,16 +989,30 @@ async def test_replace_tree_raises_when_root_missing(
     request = LineTreeReplaceRequest(
         version=1,
         tree=LineTreeReplace(
+            tag='New root',
             moves=['e2e4'],
         ),
     )
 
-    with pytest.raises(LineNotFoundError):
-        await service.replace_tree(
-            repertoire.id,
-            repertoire.user_id,
-            request,
-        )
+    await service.replace_tree(
+        repertoire.id,
+        repertoire.user_id,
+        request,
+    )
+
+    assert repertoire.version == 2
+    service.line_repository.create.assert_awaited_once()
+
+    created_root = (
+        service.line_repository.create
+        .await_args
+        .args[0]
+    )
+
+    assert created_root.repertoire_id == repertoire.id
+    assert created_root.parent_id is None
+    assert created_root.tag == 'New root'
+    assert created_root.moves == ['e2e4']
 
 
 @pytest.mark.asyncio
@@ -987,7 +1028,7 @@ async def test_create_children_recursive_creates_nested_tree(
             children=[
                 LineTreeReplace(
                     tag='Nested',
-                    moves=['b8c6'],
+                    moves=['b8c6', 'f1c4'],
                 ),
             ],
         ),
@@ -1018,4 +1059,4 @@ async def test_create_children_recursive_creates_nested_tree(
 
     assert nested_child.parent_id == first_child.id
     assert nested_child.tag == 'Nested'
-    assert nested_child.moves == ['b8c6']
+    assert nested_child.moves == ['b8c6', 'f1c4']

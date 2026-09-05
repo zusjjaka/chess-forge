@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-ROOT_DIR = Path(r'backend/repertoires')
+ROOT_DIR = Path(r'backend/repertoires/tests/unit')
 OUTPUT_FILE = Path('repertoires_source.txt')
 
 EXCLUDED_DIRS = {
@@ -12,6 +12,7 @@ EXCLUDED_DIRS = {
     '.mypy_cache',
     '.ruff_cache',
     'uv.lock',
+    # 'tests',
 }
 
 EXCLUDED_FILES = {

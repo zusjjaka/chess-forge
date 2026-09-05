@@ -43,9 +43,8 @@
 │
 ├── <a href="#get-apiv1repertoires">repertoires/</a>
 │   └── <a href="#get-apiv1repertoiresrepertoire_id">{repertoire_id}</a>
-│       ├── <a href="#get-apiv1repertoiresrepertoire_idlines">lines/</a>
-│       │   └── <a href="#get-apiv1repertoiresrepertoire_idlinesline_id">{line_id}</a>
-│       └── ...
+│       └── <a href="#get-apiv1repertoiresrepertoire_idlines">lines/</a>
+│           └── <a href="#get-apiv1repertoiresrepertoire_idlinesline_id">{line_id}</a>
 │
 └── training/
     ├── <a href="#get-apiv1trainingsessions">sessions/</a>
@@ -1116,26 +1115,6 @@ session_id: UUID
 Тренировочный сервис проверяет валидность хода и обновляет состояние сессии.
 
 При неправильном ответе сессия становится `failed`.
-
----
-
-### `POST /api/v1/training/sessions/{session_id}/finish`
-
-Завершает тренировку.
-
-**Input**
-
-Нет.
-
-**Output — `200 OK`**
-
-```json
-{
-  "id": "uuid",
-  "status": "completed",
-  "ended_at": "2026-01-01T12:10:00Z"
-}
-```
 
 ---
 

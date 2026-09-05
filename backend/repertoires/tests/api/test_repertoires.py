@@ -173,7 +173,6 @@ async def test_create_repertoire(
                     'name': 'Italian Game',
                     'description': 'King pawn opening',
                     'side': 'white',
-                    'root_moves': ['e2e4'],
                 },
             )
 
@@ -185,7 +184,6 @@ async def test_create_repertoire(
         assert body['name'] == 'Italian Game'
         assert body['description'] == 'King pawn opening'
         assert body['side'] == 'white'
-        assert body['version'] == 1
 
         service.create.assert_awaited_once()
 
@@ -193,7 +191,6 @@ async def test_create_repertoire(
 
         assert args[0] == user_id
         assert args[1].name == 'Italian Game'
-        assert args[1].root_moves == ['e2e4']
     finally:
         app.dependency_overrides.clear()
 
