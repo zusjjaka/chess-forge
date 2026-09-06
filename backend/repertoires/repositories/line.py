@@ -7,7 +7,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.repertoire import Line
+from models.line import Line
 
 
 class LineRepository:

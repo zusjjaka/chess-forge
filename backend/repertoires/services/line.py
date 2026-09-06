@@ -9,11 +9,11 @@ from exceptions import (
     LineNotFoundError,
     ParentLineMovesUpdateError,
     RepertoireNotFoundError,
-    RepertoireVersionConflictError,
+    RepertoireRevisionConflictError,
     RootLineDeletionError,
 )
+from models.line import Line
 from models.repertoire import (
-    Line,
     Repertoire,
     RepertoireSide,
 )
@@ -75,6 +75,7 @@ class LineService:
             'id': line.id,
             'tag': line.tag,
             'moves': line.moves,
+            'analytic_version': line.analytic_version,
             'children': [
                 LineService._build_subtree(
                     child,
@@ -307,11 +308,12 @@ class LineService:
                 parent_id=parent_id,
                 tag=data.tag,
                 moves=data.moves,
+                analytic_version=1,
             )
 
             await self.line_repository.create(line)
 
-            repertoire.version += 1
+            repertoire.revision += 1
 
         return line
 
@@ -357,8 +359,9 @@ class LineService:
                 )
 
                 line.moves = fields['moves']
+                line.analytic_version += 1
 
-            repertoire.version += 1
+            repertoire.revision += 1
 
         return line
 
@@ -387,7 +390,7 @@ class LineService:
 
             await self.line_repository.delete(line)
 
-            repertoire.version += 1
+            repertoire.revision += 1
 
     async def replace_tree(
             self,
@@ -419,8 +422,8 @@ class LineService:
             if repertoire is None:
                 raise RepertoireNotFoundError
 
-            if repertoire.version != data.version:
-                raise RepertoireVersionConflictError
+            if repertoire.revision != data.revision:
+                raise RepertoireRevisionConflictError
 
             root = await self.line_repository.get_root(
                 repertoire_id,
@@ -432,6 +435,7 @@ class LineService:
                     parent_id=None,
                     tag=data.tree.tag,
                     moves=data.tree.moves,
+                    analytic_version=1,
                 )
 
                 await self.line_repository.create(root)
@@ -462,7 +466,8 @@ class LineService:
                     data.tree.children,
                 )
 
-            repertoire.version += 1
+            repertoire.revision += 1
+            repertoire.analytic_version += 1
 
     async def _create_children_recursive(
             self,
@@ -476,6 +481,7 @@ class LineService:
                 parent_id=parent_id,
                 tag=child_data.tag,
                 moves=child_data.moves,
+                analytic_version=1,
             )
 
             await self.line_repository.create(child)

@@ -49,15 +49,12 @@ def service(
     service.repertoire_repository.get_by_id_for_user = AsyncMock()
     service.repertoire_repository.get_by_id_for_user_for_update = AsyncMock()
     service.repertoire_repository.get_page_for_user = AsyncMock()
-    service.repertoire_repository.update_version = AsyncMock(
-        return_value=True,
-    )
 
     return service
 
 
 @pytest.mark.asyncio
-async def test_create_creates_repertoire(
+async def test_create_creates_repertoire_with_initial_versions(
         service: RepertoireService,
         ) -> None:
     user_id = uuid.uuid4()
@@ -77,7 +74,8 @@ async def test_create_creates_repertoire(
     assert result.name == 'Italian Game'
     assert result.description == 'King pawn opening'
     assert result.side == RepertoireSide.WHITE
-    assert result.version == 1
+    assert result.revision == 1
+    assert result.analytic_version == 1
 
     service.repertoire_repository.create.assert_awaited_once()
 
@@ -91,7 +89,8 @@ async def test_create_creates_repertoire(
     assert repertoire.name == 'Italian Game'
     assert repertoire.description == 'King pawn opening'
     assert repertoire.side == RepertoireSide.WHITE
-    assert repertoire.version == 1
+    assert repertoire.revision == 1
+    assert repertoire.analytic_version == 1
 
 
 @pytest.mark.asyncio
@@ -121,7 +120,8 @@ async def test_get_returns_users_repertoire(
         name='Italian Game',
         description='',
         side=RepertoireSide.WHITE,
-        version=1,
+        revision=5,
+        analytic_version=3,
     )
 
     service.repertoire_repository.get_by_id_for_user = AsyncMock(
@@ -139,6 +139,33 @@ async def test_get_returns_users_repertoire(
         repertoire.id,
         repertoire.user_id,
     )
+
+
+@pytest.mark.asyncio
+async def test_get_does_not_change_versions(
+        service: RepertoireService,
+        ) -> None:
+    repertoire = Repertoire(
+        id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        name='Italian Game',
+        description='',
+        side=RepertoireSide.WHITE,
+        revision=5,
+        analytic_version=3,
+    )
+
+    service.repertoire_repository.get_by_id_for_user = AsyncMock(
+        return_value=repertoire,
+    )
+
+    await service.get(
+        repertoire.id,
+        repertoire.user_id,
+    )
+
+    assert repertoire.revision == 5
+    assert repertoire.analytic_version == 3
 
 
 @pytest.mark.asyncio
@@ -172,7 +199,8 @@ async def test_list_returns_items_and_pagination(
             name='First',
             description='',
             side=RepertoireSide.WHITE,
-            version=1,
+            revision=1,
+            analytic_version=1,
         ),
         Repertoire(
             id=uuid.uuid4(),
@@ -180,7 +208,8 @@ async def test_list_returns_items_and_pagination(
             name='Second',
             description='',
             side=RepertoireSide.BLACK,
-            version=1,
+            revision=4,
+            analytic_version=2,
         ),
     ]
 
@@ -251,7 +280,7 @@ async def test_list_calculates_pages_with_remainder(
 
 
 @pytest.mark.asyncio
-async def test_update_changes_name(
+async def test_update_changes_name_without_changing_versions(
         service: RepertoireService,
         ) -> None:
     repertoire = Repertoire(
@@ -260,7 +289,8 @@ async def test_update_changes_name(
         name='Old name',
         description='Description',
         side=RepertoireSide.WHITE,
-        version=1,
+        revision=7,
+        analytic_version=4,
     )
 
     service.repertoire_repository.get_by_id_for_user = AsyncMock(
@@ -280,10 +310,12 @@ async def test_update_changes_name(
     assert result is repertoire
     assert repertoire.name == 'New name'
     assert repertoire.description == 'Description'
+    assert repertoire.revision == 7
+    assert repertoire.analytic_version == 4
 
 
 @pytest.mark.asyncio
-async def test_update_changes_description(
+async def test_update_changes_description_without_changing_versions(
         service: RepertoireService,
         ) -> None:
     repertoire = Repertoire(
@@ -292,7 +324,8 @@ async def test_update_changes_description(
         name='Name',
         description='Old description',
         side=RepertoireSide.WHITE,
-        version=1,
+        revision=7,
+        analytic_version=4,
     )
 
     service.repertoire_repository.get_by_id_for_user = AsyncMock(
@@ -311,10 +344,12 @@ async def test_update_changes_description(
 
     assert result is repertoire
     assert repertoire.description == 'New description'
+    assert repertoire.revision == 7
+    assert repertoire.analytic_version == 4
 
 
 @pytest.mark.asyncio
-async def test_update_changes_all_provided_fields(
+async def test_update_changes_all_provided_fields_without_changing_versions(
         service: RepertoireService,
         ) -> None:
     repertoire = Repertoire(
@@ -323,7 +358,8 @@ async def test_update_changes_all_provided_fields(
         name='Old name',
         description='Old description',
         side=RepertoireSide.WHITE,
-        version=1,
+        revision=7,
+        analytic_version=4,
     )
 
     service.repertoire_repository.get_by_id_for_user = AsyncMock(
@@ -343,6 +379,8 @@ async def test_update_changes_all_provided_fields(
 
     assert repertoire.name == 'New name'
     assert repertoire.description == 'New description'
+    assert repertoire.revision == 7
+    assert repertoire.analytic_version == 4
 
 
 @pytest.mark.asyncio
@@ -355,7 +393,8 @@ async def test_update_does_not_change_unset_fields(
         name='Original name',
         description='Original description',
         side=RepertoireSide.WHITE,
-        version=1,
+        revision=7,
+        analytic_version=4,
     )
 
     service.repertoire_repository.get_by_id_for_user = AsyncMock(
@@ -372,6 +411,8 @@ async def test_update_does_not_change_unset_fields(
 
     assert repertoire.name == 'Original name'
     assert repertoire.description == 'Original description'
+    assert repertoire.revision == 7
+    assert repertoire.analytic_version == 4
 
 
 @pytest.mark.asyncio
@@ -384,7 +425,8 @@ async def test_update_allows_explicit_null_description(
         name='Name',
         description='Description',
         side=RepertoireSide.WHITE,
-        version=1,
+        revision=7,
+        analytic_version=4,
     )
 
     service.repertoire_repository.get_by_id_for_user = AsyncMock(
@@ -402,6 +444,8 @@ async def test_update_allows_explicit_null_description(
     )
 
     assert repertoire.description == ''
+    assert repertoire.revision == 7
+    assert repertoire.analytic_version == 4
 
 
 @pytest.mark.asyncio
@@ -440,7 +484,8 @@ async def test_update_refreshes_repertoire(
         name='Old',
         description='',
         side=RepertoireSide.WHITE,
-        version=1,
+        revision=1,
+        analytic_version=1,
     )
 
     service.repertoire_repository.get_by_id_for_user = AsyncMock(
@@ -461,7 +506,7 @@ async def test_update_refreshes_repertoire(
 
 
 @pytest.mark.asyncio
-async def test_delete_deletes_existing_repertoire(
+async def test_delete_deletes_existing_repertoire_without_changing_versions(
         service: RepertoireService,
         ) -> None:
     repertoire = Repertoire(
@@ -470,7 +515,8 @@ async def test_delete_deletes_existing_repertoire(
         name='Test',
         description='',
         side=RepertoireSide.WHITE,
-        version=1,
+        revision=9,
+        analytic_version=5,
     )
 
     service.repertoire_repository.get_by_id_for_user_for_update = AsyncMock(
@@ -489,6 +535,9 @@ async def test_delete_deletes_existing_repertoire(
     service.repertoire_repository.delete.assert_awaited_once_with(
         repertoire,
     )
+
+    assert repertoire.revision == 9
+    assert repertoire.analytic_version == 5
 
 
 @pytest.mark.asyncio

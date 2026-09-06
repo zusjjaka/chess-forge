@@ -1,8 +1,8 @@
 from pathlib import Path
 
 
-ROOT_DIR = Path(r'backend/repertoires/tests/unit')
-OUTPUT_FILE = Path('repertoires_source.txt')
+ROOT_DIR = Path(r'backend/repertoires/tests/api')
+OUTPUT_FILE = Path('source.txt')
 
 EXCLUDED_DIRS = {
     '.git',

@@ -214,6 +214,7 @@ async def create_child_line(
         'id': line.id,
         'tag': line.tag,
         'moves': line.moves,
+        'analytic_version': line.analytic_version,
         'children': [],
     })
 
@@ -240,6 +241,7 @@ async def update_line(
         'id': line.id,
         'tag': line.tag,
         'moves': line.moves,
+        'analytic_version': line.analytic_version,
         'children': [],
     })
 

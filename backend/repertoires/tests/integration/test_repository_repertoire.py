@@ -37,6 +37,31 @@ async def test_create_and_get_by_id(
 
 
 @pytest.mark.asyncio
+async def test_create_and_get_persists_versions(
+        session: AsyncSession,
+        ) -> None:
+    repertoire = Repertoire(
+        user_id=uuid.uuid4(),
+        name='Italian Game',
+        description='Test repertoire',
+        side=RepertoireSide.WHITE,
+        revision=7,
+        analytic_version=4,
+    )
+
+    repository = RepertoireRepository(session)
+
+    created = await repository.create(repertoire)
+    await session.commit()
+
+    result = await repository.get_by_id(created.id)
+
+    assert result is not None
+    assert result.revision == 7
+    assert result.analytic_version == 4
+
+
+@pytest.mark.asyncio
 async def test_get_by_id_returns_none_for_missing_repertoire(
         session: AsyncSession,
         ) -> None:
@@ -196,62 +221,6 @@ async def test_get_page_for_user_returns_empty_for_user_without_repertoires(
 
     assert items == []
     assert total == 0
-
-
-@pytest.mark.asyncio
-async def test_update_version_succeeds_for_expected_version(
-        session: AsyncSession,
-        ) -> None:
-    repertoire = Repertoire(
-        user_id=uuid.uuid4(),
-        name='Test',
-        description='',
-        side=RepertoireSide.WHITE,
-    )
-
-    repository = RepertoireRepository(session)
-
-    await repository.create(repertoire)
-    await session.commit()
-
-    result = await repository.update_version(
-        repertoire.id,
-        expected_version=1,
-    )
-
-    await session.commit()
-    await session.refresh(repertoire)
-
-    assert result is True
-    assert repertoire.version == 2
-
-
-@pytest.mark.asyncio
-async def test_update_version_fails_for_stale_version(
-        session: AsyncSession,
-        ) -> None:
-    repertoire = Repertoire(
-        user_id=uuid.uuid4(),
-        name='Test',
-        description='',
-        side=RepertoireSide.WHITE,
-    )
-
-    repository = RepertoireRepository(session)
-
-    await repository.create(repertoire)
-    await session.commit()
-
-    result = await repository.update_version(
-        repertoire.id,
-        expected_version=999,
-    )
-
-    await session.commit()
-    await session.refresh(repertoire)
-
-    assert result is False
-    assert repertoire.version == 1
 
 
 @pytest.mark.asyncio

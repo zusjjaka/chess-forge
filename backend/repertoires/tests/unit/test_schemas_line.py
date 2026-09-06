@@ -216,28 +216,28 @@ class TestLineTreeReplace:
 class TestLineTreeReplaceRequest:
     def test_valid_data(self) -> None:
         data = LineTreeReplaceRequest(
-            version=1,
+            revision=1,
             tree=LineTreeReplace(
                 moves=['e2e4'],
             ),
         )
 
-        assert data.version == 1
+        assert data.revision == 1
         assert data.tree.moves == ['e2e4']
 
-    def test_version_must_be_positive(self) -> None:
+    def test_revision_must_be_positive(self) -> None:
         with pytest.raises(ValidationError):
             LineTreeReplaceRequest(
-                version=0,
+                revision=0,
                 tree=LineTreeReplace(
                     moves=['e2e4'],
                 ),
             )
 
-    def test_negative_version_is_invalid(self) -> None:
+    def test_negative_revision_is_invalid(self) -> None:
         with pytest.raises(ValidationError):
             LineTreeReplaceRequest(
-                version=-1,
+                revision=-1,
                 tree=LineTreeReplace(
                     moves=['e2e4'],
                 ),
@@ -250,24 +250,38 @@ class TestLineResponse:
             'id': '11111111-1111-1111-1111-111111111111',
             'tag': 'Root',
             'moves': ['e2e4'],
+            'analytic_version': 2,
             'children': [
                 {
                     'id': '22222222-2222-2222-2222-222222222222',
                     'tag': 'Reply',
                     'moves': ['e7e5'],
+                    'analytic_version': 4,
                     'children': [],
                 },
             ],
         })
 
         assert data.tag == 'Root'
+        assert data.analytic_version == 2
         assert len(data.children) == 1
         assert data.children[0].tag == 'Reply'
+        assert data.children[0].analytic_version == 4
 
     def test_invalid_uuid(self) -> None:
         with pytest.raises(ValidationError):
             LineResponse.model_validate({
                 'id': 'invalid',
+                'tag': None,
+                'moves': ['e2e4'],
+                'analytic_version': 1,
+                'children': [],
+            })
+
+    def test_analytic_version_is_required(self) -> None:
+        with pytest.raises(ValidationError):
+            LineResponse.model_validate({
+                'id': '11111111-1111-1111-1111-111111111111',
                 'tag': None,
                 'moves': ['e2e4'],
                 'children': [],

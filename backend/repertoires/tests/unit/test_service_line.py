@@ -9,11 +9,11 @@ from exceptions import (
     LineNotFoundError,
     ParentLineMovesUpdateError,
     RepertoireNotFoundError,
-    RepertoireVersionConflictError,
+    RepertoireRevisionConflictError,
     RootLineDeletionError,
 )
+from models.line import Line
 from models.repertoire import (
-    Line,
     Repertoire,
     RepertoireSide,
 )
@@ -65,9 +65,6 @@ def service(
     service.repertoire_repository.delete = AsyncMock()
     service.repertoire_repository.get_by_id_for_user = AsyncMock()
     service.repertoire_repository.get_by_id_for_user_for_update = AsyncMock()
-    service.repertoire_repository.update_version = AsyncMock(
-        return_value=True,
-    )
 
     return service
 
@@ -80,7 +77,8 @@ def repertoire() -> Repertoire:
         name='Italian Game',
         description='',
         side=RepertoireSide.WHITE,
-        version=1,
+        revision=1,
+        analytic_version=1,
     )
 
 
@@ -93,6 +91,7 @@ def root(
         repertoire_id=repertoire.id,
         parent_id=None,
         moves=['e2e4'],
+        analytic_version=1,
     )
 
 
@@ -367,6 +366,7 @@ async def test_get_tree_response_builds_tree(
         repertoire_id=repertoire.id,
         parent_id=root.id,
         moves=['e7e5', 'g1f3'],
+        analytic_version=2,
     )
 
     grandchild = Line(
@@ -374,6 +374,7 @@ async def test_get_tree_response_builds_tree(
         repertoire_id=repertoire.id,
         parent_id=child.id,
         moves=['b8c6', 'f1c4'],
+        analytic_version=3,
     )
 
     service.repertoire_repository.get_by_id_for_user = AsyncMock(
@@ -399,16 +400,19 @@ async def test_get_tree_response_builds_tree(
         'id': root.id,
         'tag': None,
         'moves': ['e2e4'],
+        'analytic_version': 1,
         'children': [
             {
                 'id': child.id,
                 'tag': None,
                 'moves': ['e7e5', 'g1f3'],
+                'analytic_version': 2,
                 'children': [
                     {
                         'id': grandchild.id,
                         'tag': None,
                         'moves': ['b8c6', 'f1c4'],
+                        'analytic_version': 3,
                         'children': [],
                     },
                 ],
@@ -428,6 +432,7 @@ async def test_get_line_response_returns_subtree(
         repertoire_id=repertoire.id,
         parent_id=root.id,
         moves=['e7e5', 'g1f3'],
+        analytic_version=2,
     )
 
     grandchild = Line(
@@ -435,6 +440,7 @@ async def test_get_line_response_returns_subtree(
         repertoire_id=repertoire.id,
         parent_id=child.id,
         moves=['b8c6', 'f1c4'],
+        analytic_version=3,
     )
 
     service.repertoire_repository.get_by_id_for_user = AsyncMock(
@@ -461,11 +467,13 @@ async def test_get_line_response_returns_subtree(
         'id': child.id,
         'tag': None,
         'moves': ['e7e5', 'g1f3'],
+        'analytic_version': 2,
         'children': [
             {
                 'id': grandchild.id,
                 'tag': None,
                 'moves': ['b8c6', 'f1c4'],
+                'analytic_version': 3,
                 'children': [],
             },
         ],
@@ -473,7 +481,7 @@ async def test_get_line_response_returns_subtree(
 
 
 @pytest.mark.asyncio
-async def test_create_child_creates_line_and_increments_version(
+async def test_create_child_increments_revision_only(
         service: LineService,
         repertoire: Repertoire,
         root: Line,
@@ -504,7 +512,10 @@ async def test_create_child_creates_line_and_increments_version(
     assert result.parent_id == root.id
     assert result.tag == 'Main line'
     assert result.moves == ['e7e5', 'g1f3']
-    assert repertoire.version == 2
+    assert result.analytic_version == 1
+
+    assert repertoire.revision == 2
+    assert repertoire.analytic_version == 1
 
     service.line_repository.create.assert_awaited_once()
 
@@ -518,6 +529,7 @@ async def test_create_child_creates_line_and_increments_version(
     assert created_line.repertoire_id == repertoire.id
     assert created_line.tag == 'Main line'
     assert created_line.moves == ['e7e5', 'g1f3']
+    assert created_line.analytic_version == 1
 
 
 @pytest.mark.asyncio
@@ -568,7 +580,8 @@ async def test_create_child_rejects_illegal_moves(
         )
 
     service.line_repository.create.assert_not_awaited()
-    assert repertoire.version == 1
+    assert repertoire.revision == 1
+    assert repertoire.analytic_version == 1
 
 
 @pytest.mark.asyncio
@@ -598,11 +611,12 @@ async def test_create_child_rejects_wrong_move_count(
         )
 
     service.line_repository.create.assert_not_awaited()
-    assert repertoire.version == 1
+    assert repertoire.revision == 1
+    assert repertoire.analytic_version == 1
 
 
 @pytest.mark.asyncio
-async def test_update_tag(
+async def test_update_tag_changes_revision_only(
         service: LineService,
         repertoire: Repertoire,
         root: Line,
@@ -627,11 +641,13 @@ async def test_update_tag(
 
     assert result is root
     assert root.tag == 'Updated'
-    assert repertoire.version == 2
+    assert root.analytic_version == 1
+    assert repertoire.revision == 2
+    assert repertoire.analytic_version == 1
 
 
 @pytest.mark.asyncio
-async def test_update_leaf_moves(
+async def test_update_leaf_moves_changes_revision_and_line_analytic_version(
         service: LineService,
         repertoire: Repertoire,
         root: Line,
@@ -662,7 +678,50 @@ async def test_update_leaf_moves(
 
     assert result is root
     assert root.moves == ['d2d4']
-    assert repertoire.version == 2
+    assert root.analytic_version == 2
+
+    assert repertoire.revision == 2
+    assert repertoire.analytic_version == 1
+
+
+@pytest.mark.asyncio
+async def test_update_tag_and_moves_changes_versions_once(
+        service: LineService,
+        repertoire: Repertoire,
+        root: Line,
+        ) -> None:
+    service.repertoire_repository.get_by_id_for_user_for_update = AsyncMock(
+        return_value=repertoire,
+    )
+    service.line_repository.get_by_id_and_repertoire = AsyncMock(
+        return_value=root,
+    )
+    service.line_repository.has_children = AsyncMock(
+        return_value=False,
+    )
+    service.line_repository.get_path_to_root = AsyncMock(
+        return_value=[root],
+    )
+
+    data = LineUpdate(
+        tag='Updated',
+        moves=['d2d4'],
+    )
+
+    result = await service.update(
+        repertoire.id,
+        root.id,
+        repertoire.user_id,
+        data,
+    )
+
+    assert result is root
+    assert root.tag == 'Updated'
+    assert root.moves == ['d2d4']
+    assert root.analytic_version == 2
+
+    assert repertoire.revision == 2
+    assert repertoire.analytic_version == 1
 
 
 @pytest.mark.asyncio
@@ -692,7 +751,9 @@ async def test_update_parent_moves_raises_error(
         )
 
     assert root.moves == ['e2e4']
-    assert repertoire.version == 1
+    assert root.analytic_version == 1
+    assert repertoire.revision == 1
+    assert repertoire.analytic_version == 1
 
 
 @pytest.mark.asyncio
@@ -725,7 +786,9 @@ async def test_update_rejects_illegal_leaf_moves(
         )
 
     assert root.moves == ['e2e4']
-    assert repertoire.version == 1
+    assert root.analytic_version == 1
+    assert repertoire.revision == 1
+    assert repertoire.analytic_version == 1
 
 
 @pytest.mark.asyncio
@@ -748,7 +811,7 @@ async def test_update_raises_when_repertoire_missing(
 
 
 @pytest.mark.asyncio
-async def test_delete_child_deletes_line_and_increments_version(
+async def test_delete_child_increments_revision_only(
         service: LineService,
         repertoire: Repertoire,
         root: Line,
@@ -758,6 +821,7 @@ async def test_delete_child_deletes_line_and_increments_version(
         repertoire_id=repertoire.id,
         parent_id=root.id,
         moves=['e7e5', 'g1f3'],
+        analytic_version=4,
     )
 
     service.repertoire_repository.get_by_id_for_user_for_update = AsyncMock(
@@ -774,7 +838,9 @@ async def test_delete_child_deletes_line_and_increments_version(
     )
 
     service.line_repository.delete.assert_awaited_once_with(child)
-    assert repertoire.version == 2
+
+    assert repertoire.revision == 2
+    assert repertoire.analytic_version == 1
 
 
 @pytest.mark.asyncio
@@ -798,7 +864,9 @@ async def test_delete_root_raises_error(
         )
 
     service.line_repository.delete.assert_not_awaited()
-    assert repertoire.version == 1
+
+    assert repertoire.revision == 1
+    assert repertoire.analytic_version == 1
 
 
 @pytest.mark.asyncio
@@ -818,7 +886,7 @@ async def test_delete_raises_when_repertoire_missing(
 
 
 @pytest.mark.asyncio
-async def test_replace_tree_replaces_existing_children(
+async def test_replace_tree_replaces_existing_children_and_increments_both_repertoire_versions(
         service: LineService,
         session: MagicMock,
         repertoire: Repertoire,
@@ -829,6 +897,7 @@ async def test_replace_tree_replaces_existing_children(
         repertoire_id=repertoire.id,
         parent_id=root.id,
         moves=['e7e5', 'g1f3'],
+        analytic_version=4,
     )
 
     new_tree = LineTreeReplace(
@@ -843,7 +912,7 @@ async def test_replace_tree_replaces_existing_children(
     )
 
     request = LineTreeReplaceRequest(
-        version=1,
+        revision=1,
         tree=new_tree,
     )
 
@@ -871,7 +940,10 @@ async def test_replace_tree_replaces_existing_children(
 
     assert root.tag == 'New root'
     assert root.moves == ['d2d4']
-    assert repertoire.version == 2
+    assert root.analytic_version == 1
+
+    assert repertoire.revision == 2
+    assert repertoire.analytic_version == 2
 
     session.delete.assert_awaited_once_with(old_child)
     service.line_repository.create.assert_awaited_once()
@@ -885,6 +957,7 @@ async def test_replace_tree_replaces_existing_children(
     assert created_child.parent_id == root.id
     assert created_child.tag == 'New child'
     assert created_child.moves == ['d7d5', 'c2c4']
+    assert created_child.analytic_version == 1
 
 
 @pytest.mark.asyncio
@@ -896,7 +969,7 @@ async def test_replace_tree_rejects_missing_repertoire(
     )
 
     request = LineTreeReplaceRequest(
-        version=1,
+        revision=1,
         tree=LineTreeReplace(
             moves=['e2e4'],
         ),
@@ -911,12 +984,12 @@ async def test_replace_tree_rejects_missing_repertoire(
 
 
 @pytest.mark.asyncio
-async def test_replace_tree_rejects_version_conflict(
+async def test_replace_tree_rejects_revision_conflict(
         service: LineService,
         repertoire: Repertoire,
         root: Line,
         ) -> None:
-    repertoire.version = 2
+    repertoire.revision = 2
 
     service.repertoire_repository.get_by_id_for_user = AsyncMock(
         return_value=repertoire,
@@ -926,13 +999,13 @@ async def test_replace_tree_rejects_version_conflict(
     )
 
     request = LineTreeReplaceRequest(
-        version=1,
+        revision=1,
         tree=LineTreeReplace(
             moves=['e2e4'],
         ),
     )
 
-    with pytest.raises(RepertoireVersionConflictError):
+    with pytest.raises(RepertoireRevisionConflictError):
         await service.replace_tree(
             repertoire.id,
             repertoire.user_id,
@@ -941,6 +1014,9 @@ async def test_replace_tree_rejects_version_conflict(
 
     service.line_repository.get_root.assert_not_awaited()
     service.line_repository.create.assert_not_awaited()
+
+    assert repertoire.revision == 2
+    assert repertoire.analytic_version == 1
 
 
 @pytest.mark.asyncio
@@ -953,7 +1029,7 @@ async def test_replace_tree_rejects_invalid_tree_before_transaction(
     )
 
     request = LineTreeReplaceRequest(
-        version=1,
+        revision=1,
         tree=LineTreeReplace(
             moves=['e2e5'],
         ),
@@ -987,7 +1063,7 @@ async def test_replace_tree_creates_root_when_root_missing(
     )
 
     request = LineTreeReplaceRequest(
-        version=1,
+        revision=1,
         tree=LineTreeReplace(
             tag='New root',
             moves=['e2e4'],
@@ -1000,7 +1076,9 @@ async def test_replace_tree_creates_root_when_root_missing(
         request,
     )
 
-    assert repertoire.version == 2
+    assert repertoire.revision == 2
+    assert repertoire.analytic_version == 2
+
     service.line_repository.create.assert_awaited_once()
 
     created_root = (
@@ -1013,6 +1091,7 @@ async def test_replace_tree_creates_root_when_root_missing(
     assert created_root.parent_id is None
     assert created_root.tag == 'New root'
     assert created_root.moves == ['e2e4']
+    assert created_root.analytic_version == 1
 
 
 @pytest.mark.asyncio
@@ -1056,7 +1135,10 @@ async def test_create_children_recursive_creates_nested_tree(
     assert first_child.parent_id == root.id
     assert first_child.tag == 'First'
     assert first_child.moves == ['e7e5', 'g1f3']
+    assert first_child.analytic_version == 1
 
     assert nested_child.parent_id == first_child.id
     assert nested_child.tag == 'Nested'
     assert nested_child.moves == ['b8c6', 'f1c4']
+    assert nested_child.analytic_version == 1
+    

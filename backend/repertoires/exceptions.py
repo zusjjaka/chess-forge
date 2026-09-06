@@ -54,10 +54,10 @@ class InvalidLineMovesError(APIException):
     status_code = status.HTTP_400_BAD_REQUEST
 
 
-class RepertoireVersionConflictError(APIException):
-    """Repertoire version conflict."""
+class RepertoireRevisionConflictError(APIException):
+    """Repertoire revision conflict."""
 
-    detail = 'Repertoire version conflict'
+    detail = 'Repertoire revision conflict'
     status_code = status.HTTP_409_CONFLICT
 
 

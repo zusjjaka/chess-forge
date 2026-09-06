@@ -46,7 +46,8 @@ class RepertoireResponse(BaseModel):
     name: str
     description: str
     side: RepertoireSide
-    version: int
+    revision: int
+    analytic_version: int
     created_at: datetime
     updated_at: datetime
 

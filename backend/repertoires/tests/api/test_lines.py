@@ -9,8 +9,8 @@ from api.dependencies import (
     get_line_service,
 )
 from main import app
+from models.line import Line
 from models.repertoire import (
-    Line,
     Repertoire,
     RepertoireSide,
 )
@@ -31,7 +31,8 @@ def repertoire(
         name='Italian Game',
         description='',
         side=RepertoireSide.WHITE,
-        version=1,
+        revision=1,
+        analytic_version=1,
     )
 
 
@@ -45,6 +46,7 @@ def root(
         parent_id=None,
         tag=None,
         moves=['e2e4'],
+        analytic_version=1,
     )
 
 
@@ -60,6 +62,7 @@ async def test_get_lines(
         'id': root.id,
         'tag': None,
         'moves': ['e2e4'],
+        'analytic_version': 1,
         'children': [],
     }
 
@@ -86,6 +89,7 @@ async def test_get_lines(
 
         assert body['id'] == str(root.id)
         assert body['moves'] == ['e2e4']
+        assert body['analytic_version'] == 1
         assert body['children'] == []
 
         service.get_tree_response.assert_awaited_once_with(
@@ -108,6 +112,7 @@ async def test_get_line(
         'id': root.id,
         'tag': 'Root',
         'moves': ['e2e4'],
+        'analytic_version': 3,
         'children': [],
     }
 
@@ -134,6 +139,7 @@ async def test_get_line(
 
         assert body['id'] == str(root.id)
         assert body['tag'] == 'Root'
+        assert body['analytic_version'] == 3
 
         service.get_line_response.assert_awaited_once_with(
             repertoire.id,
@@ -158,6 +164,7 @@ async def test_create_line(
         parent_id=root.id,
         tag='Main line',
         moves=['e7e5', 'g1f3'],
+        analytic_version=1,
     )
 
     service.create_child.return_value = child
@@ -190,6 +197,7 @@ async def test_create_line(
         assert body['id'] == str(child.id)
         assert body['tag'] == 'Main line'
         assert body['moves'] == ['e7e5', 'g1f3']
+        assert body['analytic_version'] == 1
 
         service.create_child.assert_awaited_once()
 
@@ -334,7 +342,7 @@ async def test_replace_tree(
             response = await client.put(
                 f'/api/v1/repertoires/{repertoire.id}/lines',
                 json={
-                    'version': 1,
+                    'revision': 1,
                     'tree': {
                         'tag': 'Root',
                         'moves': ['e2e4'],
@@ -351,7 +359,7 @@ async def test_replace_tree(
 
         assert args[0] == repertoire.id
         assert args[1] == user_id
-        assert args[2].version == 1
+        assert args[2].revision == 1
         assert args[2].tree.moves == ['e2e4']
     finally:
         app.dependency_overrides.clear()

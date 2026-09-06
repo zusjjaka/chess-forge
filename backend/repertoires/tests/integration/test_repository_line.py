@@ -4,8 +4,8 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from models.line import Line
 from models.repertoire import (
-    Line,
     Repertoire,
     RepertoireSide,
 )
@@ -32,6 +32,7 @@ async def repertoire(
         repertoire_id=repertoire.id,
         parent_id=None,
         moves=['e2e4'],
+        analytic_version=1,
     )
 
     session.add(root)
@@ -55,6 +56,7 @@ async def test_create_and_get_by_id(
         repertoire_id=repertoire.id,
         parent_id=root.id,
         moves=['e7e5'],
+        analytic_version=1,
     )
 
     await repository.create(line)
@@ -66,6 +68,34 @@ async def test_create_and_get_by_id(
     assert result.id == line.id
     assert result.repertoire_id == repertoire.id
     assert result.moves == ['e7e5']
+    assert result.analytic_version == 1
+
+
+@pytest.mark.asyncio
+async def test_create_and_get_persists_analytic_version(
+        session: AsyncSession,
+        repertoire: Repertoire,
+        ) -> None:
+    repository = LineRepository(session)
+
+    root = await repository.get_root(repertoire.id)
+
+    assert root is not None
+
+    line = Line(
+        repertoire_id=repertoire.id,
+        parent_id=root.id,
+        moves=['e7e5'],
+        analytic_version=7,
+    )
+
+    await repository.create(line)
+    await session.commit()
+
+    result = await repository.get_by_id(line.id)
+
+    assert result is not None
+    assert result.analytic_version == 7
 
 
 @pytest.mark.asyncio

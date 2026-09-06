@@ -32,7 +32,8 @@ class RepertoireService:
                 name=data.name,
                 description=data.description,
                 side=data.side,
-                version=1,
+                revision=1,
+                analytic_version=1,
             )
 
             await self.repertoire_repository.create(

@@ -69,11 +69,12 @@ class LineResponse(BaseModel):
     id: uuid.UUID
     tag: str | None
     moves: list[UCIMove]
+    analytic_version: int
     children: list['LineResponse']
 
 
 class LineTreeReplaceRequest(BaseModel):
-    version: int = Field(
+    revision: int = Field(
         ge=1,
     )
     tree: LineTreeReplace

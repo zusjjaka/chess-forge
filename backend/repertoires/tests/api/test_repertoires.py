@@ -1,6 +1,6 @@
 import uuid
-from unittest.mock import AsyncMock
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -26,13 +26,15 @@ def repertoire(
         user_id: uuid.UUID,
         ) -> Repertoire:
     now = datetime.now(timezone.utc)
+
     return Repertoire(
         id=uuid.uuid4(),
         user_id=user_id,
         name='Italian Game',
         description='King pawn opening',
         side=RepertoireSide.WHITE,
-        version=1,
+        revision=1,
+        analytic_version=1,
         created_at=now,
         updated_at=now,
     )
@@ -76,6 +78,8 @@ async def test_list_repertoires(
         assert body['pages'] == 1
         assert len(body['items']) == 1
         assert body['items'][0]['id'] == str(repertoire.id)
+        assert body['items'][0]['revision'] == 1
+        assert body['items'][0]['analytic_version'] == 1
 
         service.list.assert_awaited_once_with(
             user_id,
@@ -184,6 +188,8 @@ async def test_create_repertoire(
         assert body['name'] == 'Italian Game'
         assert body['description'] == 'King pawn opening'
         assert body['side'] == 'white'
+        assert body['revision'] == 1
+        assert body['analytic_version'] == 1
 
         service.create.assert_awaited_once()
 
@@ -213,7 +219,6 @@ async def test_create_repertoire_rejects_invalid_body(
                 json={
                     'name': '',
                     'side': 'white',
-                    'root_moves': [],
                 },
             )
 
@@ -253,6 +258,8 @@ async def test_get_repertoire(
 
         assert body['id'] == str(repertoire.id)
         assert body['user_id'] == str(user_id)
+        assert body['revision'] == 1
+        assert body['analytic_version'] == 1
 
         service.get.assert_awaited_once_with(
             repertoire.id,

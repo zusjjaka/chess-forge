@@ -30,7 +30,7 @@ HTTP-метод не поддерживается для данного endpoint
 
 Операция конфликтует с текущим состоянием ресурса.
 
-Используется, в частности, при конфликте версии репертуара во время замены дерева.
+Для Repertoire Service используется, в частности, при конфликте `revision` во время замены дерева.
 
 ### `415 Unsupported Media Type`
 
@@ -176,7 +176,7 @@ HTTP-метод не поддерживается для данного endpoint
 
 Ошибка возникает при попытке удалить root line репертуара.
 
-Root line создаётся автоматически вместе с репертуаром и не может быть удалён отдельно.
+Root line создаётся при первой полной инициализации дерева через `PUT /api/v1/repertoires/{repertoire_id}/lines` и не может быть удалён отдельно.
 
 **HTTP Response — `400 Bad Request`**
 
@@ -196,21 +196,21 @@ Root line создаётся автоматически вместе с репе
 
 ---
 
-### `RepertoireVersionConflictError`
+### `RepertoireRevisionConflictError`
 
-Ошибка возникает при попытке заменить дерево репертуара с использованием устаревшей версии.
+Ошибка возникает при попытке заменить дерево репертуара с использованием устаревшей `revision`.
 
 Используется optimistic locking для:
 
 ```text
 PUT /api/v1/repertoires/{repertoire_id}/lines
-````
+```
 
-Клиент передаёт версию репертуара, которую он получил перед изменением:
+Клиент передаёт ревизию репертуара, которую он получил перед изменением:
 
 ```json
 {
-  "version": 5,
+  "revision": 5,
   "tree": {
     "tag": null,
     "moves": [
@@ -221,10 +221,10 @@ PUT /api/v1/repertoires/{repertoire_id}/lines
 }
 ```
 
-Если текущая версия репертуара уже изменилась:
+Если текущая ревизия репертуара уже изменилась:
 
 ```text
-requested version != current version
+requested revision != current revision
 ```
 
 изменения дерева не применяются.
@@ -232,5 +232,67 @@ requested version != current version
 **HTTP Response — `409 Conflict`**
 
 ```text
-Repertoire version conflict
+Repertoire revision conflict
 ```
+
+---
+
+### `InvalidLineMovesError`
+
+Ошибка возникает, когда переданная последовательность ходов линии нарушает правила домена.
+
+Проверяются:
+
+* синтаксис UCI;
+* легальность ходов относительно текущей позиции;
+* соответствие стороне, которая делает ход;
+* допустимое количество ходов для root line;
+* допустимое количество ходов для non-root line.
+
+**HTTP Response — `400 Bad Request`**
+
+---
+
+### `RootLineAlreadyExistsError`
+
+Ошибка возникает при попытке создать более одной root line для одного репертуара.
+
+Root line определяется как линия с `parent_id = NULL`.
+
+**HTTP Response — `409 Conflict`**
+
+---
+
+### `InvalidLineRelationshipError`
+
+Ошибка возникает при попытке создать дочернюю линию, у которой `parent_id` указывает на линию из другого репертуара.
+
+Связь `repertoire_id + parent_id` защищается составным PostgreSQL Foreign Key.
+
+**HTTP Response — `409 Conflict`**
+
+---
+
+### `DatabaseCheckConstraintError`
+
+Ошибка возникает при нарушении PostgreSQL CHECK constraint.
+
+В частности, линия не может содержать пустой список `moves`.
+
+**HTTP Response — `422 Unprocessable Entity`**
+
+---
+
+### `DatabaseConnectionError`
+
+Ошибка возникает при недоступности PostgreSQL.
+
+**HTTP Response — `503 Service Unavailable`**
+
+---
+
+### `DatabaseError`
+
+Ошибка возникает при неожиданной ошибке базы данных.
+
+**HTTP Response — `500 Internal Server Error`**
