@@ -34,7 +34,6 @@ def repertoire(
         description='King pawn opening',
         side=RepertoireSide.WHITE,
         revision=1,
-        analytic_version=1,
         created_at=now,
         updated_at=now,
     )
@@ -79,7 +78,6 @@ async def test_list_repertoires(
         assert len(body['items']) == 1
         assert body['items'][0]['id'] == str(repertoire.id)
         assert body['items'][0]['revision'] == 1
-        assert body['items'][0]['analytic_version'] == 1
 
         service.list.assert_awaited_once_with(
             user_id,
@@ -189,7 +187,6 @@ async def test_create_repertoire(
         assert body['description'] == 'King pawn opening'
         assert body['side'] == 'white'
         assert body['revision'] == 1
-        assert body['analytic_version'] == 1
 
         service.create.assert_awaited_once()
 
@@ -259,7 +256,6 @@ async def test_get_repertoire(
         assert body['id'] == str(repertoire.id)
         assert body['user_id'] == str(user_id)
         assert body['revision'] == 1
-        assert body['analytic_version'] == 1
 
         service.get.assert_awaited_once_with(
             repertoire.id,

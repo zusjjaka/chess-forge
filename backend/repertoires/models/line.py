@@ -70,6 +70,10 @@ class Line(Base):
         nullable=False,
         default=1,
     )
+    parent_analytic_version: Mapped[int | None] = mapped_column(
+        nullable=True,
+        default=None,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

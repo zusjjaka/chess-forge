@@ -37,7 +37,7 @@ async def test_create_and_get_by_id(
 
 
 @pytest.mark.asyncio
-async def test_create_and_get_persists_versions(
+async def test_create_and_get_persists_revision(
         session: AsyncSession,
         ) -> None:
     repertoire = Repertoire(
@@ -46,7 +46,6 @@ async def test_create_and_get_persists_versions(
         description='Test repertoire',
         side=RepertoireSide.WHITE,
         revision=7,
-        analytic_version=4,
     )
 
     repository = RepertoireRepository(session)
@@ -58,7 +57,6 @@ async def test_create_and_get_persists_versions(
 
     assert result is not None
     assert result.revision == 7
-    assert result.analytic_version == 4
 
 
 @pytest.mark.asyncio

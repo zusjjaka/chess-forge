@@ -161,7 +161,6 @@ class TestRepertoireResponse:
             'description': '',
             'side': 'white',
             'revision': 7,
-            'analytic_version': 3,
             'created_at': '2026-09-04T12:00:00+00:00',
             'updated_at': '2026-09-04T12:00:00+00:00',
         })
@@ -169,7 +168,6 @@ class TestRepertoireResponse:
         assert data.name == 'Italian Game'
         assert data.side == RepertoireSide.WHITE
         assert data.revision == 7
-        assert data.analytic_version == 3
 
     def test_revision_is_required(self) -> None:
         with pytest.raises(ValidationError):
@@ -179,20 +177,6 @@ class TestRepertoireResponse:
                 'name': 'Italian Game',
                 'description': '',
                 'side': 'white',
-                'analytic_version': 3,
-                'created_at': '2026-09-04T12:00:00+00:00',
-                'updated_at': '2026-09-04T12:00:00+00:00',
-            })
-
-    def test_analytic_version_is_required(self) -> None:
-        with pytest.raises(ValidationError):
-            RepertoireResponse.model_validate({
-                'id': '11111111-1111-1111-1111-111111111111',
-                'user_id': '22222222-2222-2222-2222-222222222222',
-                'name': 'Italian Game',
-                'description': '',
-                'side': 'white',
-                'revision': 7,
                 'created_at': '2026-09-04T12:00:00+00:00',
                 'updated_at': '2026-09-04T12:00:00+00:00',
             })

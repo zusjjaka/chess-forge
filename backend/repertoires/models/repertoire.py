@@ -66,10 +66,6 @@ class Repertoire(Base):
         nullable=False,
         default=1,
     )
-    analytic_version: Mapped[int] = mapped_column(
-        nullable=False,
-        default=1,
-    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

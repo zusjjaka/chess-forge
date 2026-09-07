@@ -43,7 +43,6 @@ async def test_repertoire_creation_is_committed(
     assert saved is not None
     assert saved.id == repertoire_id
     assert saved.revision == 1
-    assert saved.analytic_version == 1
 
 
 @pytest.mark.asyncio
@@ -96,6 +95,7 @@ async def test_line_creation_is_rolled_back_with_parent_transaction(
         parent_id=None,
         moves=['e2e4'],
         analytic_version=1,
+        parent_analytic_version=None,
     )
 
     session.add(line)
@@ -142,33 +142,6 @@ async def test_revision_increment_is_persisted(
     await session.refresh(repertoire)
 
     assert repertoire.revision == 2
-    assert repertoire.analytic_version == 1
-
-
-@pytest.mark.asyncio
-async def test_repertoire_analytic_version_increment_is_persisted(
-        session: AsyncSession,
-        ) -> None:
-    repository = RepertoireRepository(session)
-
-    repertoire = Repertoire(
-        user_id=uuid.uuid4(),
-        name='Test',
-        description='',
-        side=RepertoireSide.WHITE,
-    )
-
-    await repository.create(repertoire)
-    await session.commit()
-
-    repertoire.analytic_version += 1
-
-    await session.commit()
-
-    await session.refresh(repertoire)
-
-    assert repertoire.revision == 1
-    assert repertoire.analytic_version == 2
 
 
 @pytest.mark.asyncio
@@ -191,6 +164,7 @@ async def test_line_analytic_version_increment_is_persisted(
         parent_id=None,
         moves=['e2e4'],
         analytic_version=1,
+        parent_analytic_version=None,
     )
 
     session.add(line)
@@ -203,10 +177,11 @@ async def test_line_analytic_version_increment_is_persisted(
     await session.refresh(line)
 
     assert line.analytic_version == 2
+    assert line.parent_analytic_version is None
 
 
 @pytest.mark.asyncio
-async def test_version_changes_are_persisted_atomically(
+async def test_line_analytic_versions_can_be_persisted_together(
         session: AsyncSession,
         ) -> None:
     repository = RepertoireRepository(session)
@@ -219,21 +194,26 @@ async def test_version_changes_are_persisted_atomically(
     )
 
     await repository.create(repertoire)
+
+    line = Line(
+        repertoire_id=repertoire.id,
+        parent_id=None,
+        moves=['e2e4'],
+        analytic_version=3,
+        parent_analytic_version=2,
+    )
+
+    session.add(line)
     await session.commit()
 
-    repertoire.revision += 1
-    repertoire.analytic_version += 1
+    await session.refresh(line)
 
-    await session.commit()
-
-    await session.refresh(repertoire)
-
-    assert repertoire.revision == 2
-    assert repertoire.analytic_version == 2
+    assert line.analytic_version == 3
+    assert line.parent_analytic_version == 2
 
 
 @pytest.mark.asyncio
-async def test_version_changes_are_rolled_back_together(
+async def test_line_analytic_versions_are_rolled_back_together(
         session: AsyncSession,
         ) -> None:
     repository = RepertoireRepository(session)
@@ -246,17 +226,27 @@ async def test_version_changes_are_rolled_back_together(
     )
 
     await repository.create(repertoire)
+
+    line = Line(
+        repertoire_id=repertoire.id,
+        parent_id=None,
+        moves=['e2e4'],
+        analytic_version=1,
+        parent_analytic_version=None,
+    )
+
+    session.add(line)
     await session.commit()
 
-    repertoire.revision += 1
-    repertoire.analytic_version += 1
+    line.analytic_version = 2
+    line.parent_analytic_version = 1
 
     await session.rollback()
 
-    await session.refresh(repertoire)
+    await session.refresh(line)
 
-    assert repertoire.revision == 1
-    assert repertoire.analytic_version == 1
+    assert line.analytic_version == 1
+    assert line.parent_analytic_version is None
 
 
 @pytest.mark.asyncio

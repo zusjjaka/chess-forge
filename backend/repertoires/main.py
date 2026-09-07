@@ -39,7 +39,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
 
 app = FastAPI(
     title='ChessForge Repertoires Service',
-    version='0.1.0',
+    version='1.1.0',
     lifespan=lifespan,
 )
 

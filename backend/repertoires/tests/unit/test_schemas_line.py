@@ -1,11 +1,15 @@
+import uuid
+
 import pytest
 from pydantic import ValidationError
 
 from schemas.line import (
+    LineBatchCreate,
+    LineBatchUpdate,
     LineCreate,
+    LinePatchRequest,
+    LinePatchResponse,
     LineResponse,
-    LineTreeReplace,
-    LineTreeReplaceRequest,
     LineUpdate,
 )
 
@@ -156,91 +160,205 @@ class TestLineUpdate:
             )
 
 
-class TestLineTreeReplace:
-    def test_valid_leaf(self) -> None:
-        data = LineTreeReplace(
+class TestLineBatchCreate:
+    def test_valid_data(self) -> None:
+        line_id = uuid.uuid4()
+        parent_id = uuid.uuid4()
+
+        data = LineBatchCreate(
+            line_id=line_id,
+            parent_id=parent_id,
+            tag='Sicilian',
+            moves=['e7e5', 'g1f3'],
+        )
+
+        assert data.line_id == line_id
+        assert data.parent_id == parent_id
+        assert data.tag == 'Sicilian'
+        assert data.moves == ['e7e5', 'g1f3']
+
+    def test_parent_id_is_optional(self) -> None:
+        data = LineBatchCreate(
+            line_id=uuid.uuid4(),
             moves=['e2e4'],
         )
 
-        assert data.moves == ['e2e4']
-        assert data.children == []
+        assert data.parent_id is None
 
-    def test_children_default_to_empty_list(self) -> None:
-        data = LineTreeReplace(
-            moves=['e2e4'],
+    def test_line_id_is_required(self) -> None:
+        with pytest.raises(ValidationError):
+            LineBatchCreate(
+                moves=['e2e4'],
+            )
+
+    def test_moves_cannot_be_empty(self) -> None:
+        with pytest.raises(ValidationError):
+            LineBatchCreate(
+                line_id=uuid.uuid4(),
+                moves=[],
+            )
+
+
+class TestLineBatchUpdate:
+    def test_valid_data(self) -> None:
+        line_id = uuid.uuid4()
+
+        data = LineBatchUpdate(
+            line_id=line_id,
+            tag='Updated',
+            moves=['e7e5', 'g1f3'],
         )
 
-        assert data.children == []
+        assert data.line_id == line_id
+        assert data.tag == 'Updated'
+        assert data.moves == ['e7e5', 'g1f3']
 
-    def test_nested_children(self) -> None:
-        data = LineTreeReplace(
-            moves=['e2e4'],
-            children=[
-                LineTreeReplace(
-                    moves=['e7e5'],
-                    children=[
-                        LineTreeReplace(
-                            moves=['g1f3'],
-                        ),
-                    ],
+    def test_only_tag_can_be_updated(self) -> None:
+        data = LineBatchUpdate(
+            line_id=uuid.uuid4(),
+            tag='Updated',
+        )
+
+        assert data.moves is None
+
+    def test_only_moves_can_be_updated(self) -> None:
+        data = LineBatchUpdate(
+            line_id=uuid.uuid4(),
+            moves=['e7e5', 'g1f3'],
+        )
+
+        assert data.tag is None
+        assert data.moves == ['e7e5', 'g1f3']
+
+    def test_all_fields_except_line_id_are_optional(self) -> None:
+        data = LineBatchUpdate(
+            line_id=uuid.uuid4(),
+        )
+
+        assert data.model_dump(exclude_unset=True) == {
+            'line_id': data.line_id,
+        }
+
+    def test_moves_cannot_be_empty(self) -> None:
+        with pytest.raises(ValidationError):
+            LineBatchUpdate(
+                line_id=uuid.uuid4(),
+                moves=[],
+            )
+
+
+class TestLinePatchRequest:
+    def test_valid_create_operation(self) -> None:
+        data = LinePatchRequest(
+            revision=4,
+            create=[
+                LineBatchCreate(
+                    line_id=uuid.uuid4(),
+                    parent_id=uuid.uuid4(),
+                    moves=['e7e5', 'g1f3'],
                 ),
             ],
         )
 
-        assert len(data.children) == 1
-        assert data.children[0].moves == ['e7e5']
-        assert data.children[0].children[0].moves == ['g1f3']
+        assert data.revision == 4
+        assert len(data.create) == 1
+        assert data.update == []
+        assert data.delete == []
 
-    def test_moves_cannot_be_empty(self) -> None:
-        with pytest.raises(ValidationError):
-            LineTreeReplace(
-                moves=[],
-            )
+    def test_valid_update_operation(self) -> None:
+        line_id = uuid.uuid4()
 
-    def test_tag_max_length(self) -> None:
-        data = LineTreeReplace(
-            tag='a' * 100,
-            moves=['e2e4'],
+        data = LinePatchRequest(
+            revision=4,
+            update=[
+                LineBatchUpdate(
+                    line_id=line_id,
+                    tag='Updated',
+                ),
+            ],
         )
 
-        assert len(data.tag) == 100
+        assert data.update[0].line_id == line_id
 
-    def test_tag_cannot_exceed_max_length(self) -> None:
-        with pytest.raises(ValidationError):
-            LineTreeReplace(
-                tag='a' * 101,
-                moves=['e2e4'],
-            )
+    def test_valid_delete_operation(self) -> None:
+        line_id = uuid.uuid4()
 
-
-class TestLineTreeReplaceRequest:
-    def test_valid_data(self) -> None:
-        data = LineTreeReplaceRequest(
-            revision=1,
-            tree=LineTreeReplace(
-                moves=['e2e4'],
-            ),
+        data = LinePatchRequest(
+            revision=4,
+            delete=[line_id],
         )
 
-        assert data.revision == 1
-        assert data.tree.moves == ['e2e4']
+        assert data.delete == [line_id]
+
+    def test_all_operations_can_be_combined(self) -> None:
+        create_id = uuid.uuid4()
+        update_id = uuid.uuid4()
+        delete_id = uuid.uuid4()
+
+        data = LinePatchRequest(
+            revision=4,
+            create=[
+                LineBatchCreate(
+                    line_id=create_id,
+                    moves=['e7e5', 'g1f3'],
+                ),
+            ],
+            update=[
+                LineBatchUpdate(
+                    line_id=update_id,
+                    tag='Updated',
+                ),
+            ],
+            delete=[delete_id],
+        )
+
+        assert len(data.create) == 1
+        assert len(data.update) == 1
+        assert data.delete == [delete_id]
 
     def test_revision_must_be_positive(self) -> None:
         with pytest.raises(ValidationError):
-            LineTreeReplaceRequest(
+            LinePatchRequest(
                 revision=0,
-                tree=LineTreeReplace(
-                    moves=['e2e4'],
-                ),
+                update=[
+                    LineBatchUpdate(
+                        line_id=uuid.uuid4(),
+                        tag='Updated',
+                    ),
+                ],
             )
 
     def test_negative_revision_is_invalid(self) -> None:
         with pytest.raises(ValidationError):
-            LineTreeReplaceRequest(
+            LinePatchRequest(
                 revision=-1,
-                tree=LineTreeReplace(
-                    moves=['e2e4'],
-                ),
+                update=[
+                    LineBatchUpdate(
+                        line_id=uuid.uuid4(),
+                        tag='Updated',
+                    ),
+                ],
+            )
+
+    def test_at_least_one_operation_is_required(self) -> None:
+        with pytest.raises(ValidationError):
+            LinePatchRequest(
+                revision=1,
+            )
+
+
+class TestLinePatchResponse:
+    def test_valid_response(self) -> None:
+        data = LinePatchResponse(
+            revision=5,
+        )
+
+        assert data.revision == 5
+
+    def test_revision_must_be_integer(self) -> None:
+        with pytest.raises(ValidationError):
+            LinePatchResponse(
+                revision='invalid',
             )
 
 

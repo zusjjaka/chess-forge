@@ -33,6 +33,7 @@ async def repertoire(
         parent_id=None,
         moves=['e2e4'],
         analytic_version=1,
+        parent_analytic_version=None,
     )
 
     session.add(root)
@@ -57,6 +58,7 @@ async def test_create_and_get_by_id(
         parent_id=root.id,
         moves=['e7e5'],
         analytic_version=1,
+        parent_analytic_version=None,
     )
 
     await repository.create(line)
@@ -69,6 +71,7 @@ async def test_create_and_get_by_id(
     assert result.repertoire_id == repertoire.id
     assert result.moves == ['e7e5']
     assert result.analytic_version == 1
+    assert result.parent_analytic_version is None
 
 
 @pytest.mark.asyncio
@@ -87,6 +90,7 @@ async def test_create_and_get_persists_analytic_version(
         parent_id=root.id,
         moves=['e7e5'],
         analytic_version=7,
+        parent_analytic_version=None,
     )
 
     await repository.create(line)
@@ -96,6 +100,36 @@ async def test_create_and_get_persists_analytic_version(
 
     assert result is not None
     assert result.analytic_version == 7
+    assert result.parent_analytic_version is None
+
+
+@pytest.mark.asyncio
+async def test_parent_analytic_version_can_be_persisted(
+        session: AsyncSession,
+        repertoire: Repertoire,
+        ) -> None:
+    repository = LineRepository(session)
+
+    root = await repository.get_root(repertoire.id)
+
+    assert root is not None
+
+    line = Line(
+        repertoire_id=repertoire.id,
+        parent_id=root.id,
+        moves=['e7e5'],
+        analytic_version=3,
+        parent_analytic_version=1,
+    )
+
+    await repository.create(line)
+    await session.commit()
+
+    result = await repository.get_by_id(line.id)
+
+    assert result is not None
+    assert result.analytic_version == 3
+    assert result.parent_analytic_version == 1
 
 
 @pytest.mark.asyncio

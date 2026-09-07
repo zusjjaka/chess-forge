@@ -6,17 +6,14 @@ from httpx import ASGITransport, AsyncClient
 
 from api.dependencies import (
     get_current_user_id,
-    get_line_service,
     get_repertoire_service,
 )
 from exceptions import (
     DatabaseConnectionError,
     DatabaseError,
-    InvalidLineRelationshipError,
     LineNotFoundError,
     RepertoireNotFoundError,
     RepertoireRevisionConflictError,
-    RootLineAlreadyExistsError,
     RootLineDeletionError,
 )
 from main import app

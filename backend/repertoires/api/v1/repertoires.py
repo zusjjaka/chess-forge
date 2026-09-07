@@ -15,8 +15,9 @@ from api.dependencies import (
 )
 from schemas.line import (
     LineCreate,
+    LinePatchRequest,
+    LinePatchResponse,
     LineResponse,
-    LineTreeReplaceRequest,
     LineUpdate,
 )
 from schemas.repertoire import (
@@ -153,23 +154,25 @@ async def get_lines(
     return LineResponse.model_validate(tree)
 
 
-@router.put(
+@router.patch(
     '/{repertoire_id}/lines',
-    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=LinePatchResponse,
 )
-async def replace_lines(
+async def patch_lines(
         repertoire_id: uuid.UUID,
-        data: LineTreeReplaceRequest,
+        data: LinePatchRequest,
         user_id: uuid.UUID = Depends(get_current_user_id),
         service: LineService = Depends(get_line_service),
-        ) -> Response:
-    await service.replace_tree(
+        ) -> LinePatchResponse:
+    revision = await service.patch_lines(
         repertoire_id,
         user_id,
         data,
     )
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return LinePatchResponse(
+        revision=revision,
+    )
 
 
 @router.get(

@@ -33,7 +33,6 @@ class RepertoireService:
                 description=data.description,
                 side=data.side,
                 revision=1,
-                analytic_version=1,
             )
 
             await self.repertoire_repository.create(
@@ -92,7 +91,9 @@ class RepertoireService:
                 repertoire.name = str(fields.get('name'))
 
             if 'description' in fields:
-                repertoire.description = str(fields.get('description') or '')
+                repertoire.description = str(
+                    fields.get('description') or '',
+                )
 
         await self.session.refresh(repertoire)
 

@@ -6,10 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from domains.chess_validator import ChessValidator
 from exceptions import (
     InvalidLineMovesError,
+    InvalidLineRelationshipError,
     LineNotFoundError,
     ParentLineMovesUpdateError,
     RepertoireNotFoundError,
     RepertoireRevisionConflictError,
+    RootLineAlreadyExistsError,
     RootLineDeletionError,
 )
 from models.line import Line
@@ -20,9 +22,9 @@ from models.repertoire import (
 from repositories.line import LineRepository
 from repositories.repertoire import RepertoireRepository
 from schemas.line import (
+    LineBatchCreate,
     LineCreate,
-    LineTreeReplace,
-    LineTreeReplaceRequest,
+    LinePatchRequest,
     LineUpdate,
 )
 
@@ -157,29 +159,200 @@ class LineService:
             line.parent_id is None,
         )
 
-    def _validate_tree(
+    async def _validate_new_line_moves(
             self,
-            node: LineTreeReplace,
-            board: chess.Board,
-            side: RepertoireSide,
-            is_root: bool,
+            repertoire_side: RepertoireSide,
+            repertoire_id: uuid.UUID,
+            parent: Line | None,
+            moves: list[str],
             ) -> None:
-        current_board = board.copy()
+        board = chess.Board()
+
+        if parent is not None:
+            path = await self.line_repository.get_path_to_root(
+                parent.id,
+                repertoire_id,
+            )
+
+            for current_line in path:
+                self.chess_validator.apply_persisted_moves(
+                    board,
+                    current_line.moves,
+                )
 
         self._validate_moves(
-            current_board,
-            node.moves,
-            side,
-            is_root,
+            board,
+            moves,
+            repertoire_side,
+            parent is None,
         )
 
-        for child in node.children:
-            self._validate_tree(
-                child,
-                current_board,
-                side,
-                False,
-            )
+    @staticmethod
+    def _validate_batch_ids(
+            data: LinePatchRequest,
+            existing_ids: set[uuid.UUID],
+            ) -> None:
+        create_ids = [item.line_id for item in data.create]
+        update_ids = [item.line_id for item in data.update]
+        delete_ids = data.delete
+
+        if len(create_ids) != len(set(create_ids)):
+            raise InvalidLineRelationshipError
+
+        if len(update_ids) != len(set(update_ids)):
+            raise InvalidLineRelationshipError
+
+        if len(delete_ids) != len(set(delete_ids)):
+            raise InvalidLineRelationshipError
+
+        create_set = set(create_ids)
+        update_set = set(update_ids)
+        delete_set = set(delete_ids)
+
+        if create_set & update_set:
+            raise InvalidLineRelationshipError
+
+        if create_set & delete_set:
+            raise InvalidLineRelationshipError
+
+        if update_set & delete_set:
+            raise InvalidLineRelationshipError
+
+        if create_set & existing_ids:
+            raise InvalidLineRelationshipError
+
+        if not update_set <= existing_ids:
+            raise LineNotFoundError
+
+        if not delete_set <= existing_ids:
+            raise LineNotFoundError
+
+    @staticmethod
+    def _validate_delete_tree(
+            lines_by_id: dict[uuid.UUID, Line],
+            delete_ids: set[uuid.UUID],
+            ) -> None:
+        for line_id in delete_ids:
+            current = lines_by_id[line_id].parent_id
+
+            while current is not None:
+                if current in delete_ids:
+                    raise InvalidLineRelationshipError
+
+                parent = lines_by_id.get(current)
+
+                if parent is None:
+                    break
+
+                current = parent.parent_id
+
+    @staticmethod
+    def _validate_create_relationships(
+            items: list[LineBatchCreate],
+            existing_lines: dict[uuid.UUID, Line],
+            delete_ids: set[uuid.UUID],
+            ) -> None:
+        create_ids = {item.line_id for item in items}
+
+        for item in items:
+            if item.parent_id is None:
+                continue
+
+            if item.parent_id in delete_ids:
+                raise InvalidLineRelationshipError
+
+            if (
+                item.parent_id not in existing_lines
+                and item.parent_id not in create_ids
+            ):
+                raise InvalidLineRelationshipError
+
+            if item.parent_id == item.line_id:
+                raise InvalidLineRelationshipError
+
+    @staticmethod
+    def _validate_create_update_conflicts(
+            data: LinePatchRequest,
+            ) -> None:
+        update_move_ids = {
+            item.line_id
+            for item in data.update
+            if item.moves is not None
+        }
+
+        create_parent_ids = {
+            item.parent_id
+            for item in data.create
+            if item.parent_id is not None
+        }
+
+        if update_move_ids & create_parent_ids:
+            raise ParentLineMovesUpdateError
+
+    async def _create_batch_lines(
+            self,
+            repertoire_id: uuid.UUID,
+            repertoire_side: RepertoireSide,
+            items: list[LineBatchCreate],
+            existing_lines: dict[uuid.UUID, Line],
+            ) -> None:
+        pending = list(items)
+        created_ids: set[uuid.UUID] = set()
+
+        while pending:
+            progress = False
+            next_pending: list[LineBatchCreate] = []
+
+            for data in pending:
+                parent: Line | None = None
+
+                if data.parent_id is not None:
+                    if data.parent_id in created_ids:
+                        parent = await self._get_line(
+                            repertoire_id,
+                            data.parent_id,
+                        )
+                    elif data.parent_id in existing_lines:
+                        parent = existing_lines[data.parent_id]
+                    else:
+                        next_pending.append(data)
+                        continue
+
+                await self._validate_new_line_moves(
+                    repertoire_side,
+                    repertoire_id,
+                    parent,
+                    data.moves,
+                )
+
+                if parent is None:
+                    existing_root = await self.line_repository.get_root(
+                        repertoire_id,
+                    )
+
+                    if existing_root is not None:
+                        raise RootLineAlreadyExistsError
+
+                line = Line(
+                    id=data.line_id,
+                    repertoire_id=repertoire_id,
+                    parent_id=data.parent_id,
+                    tag=data.tag,
+                    moves=data.moves,
+                    analytic_version=1,
+                    parent_analytic_version=None,
+                )
+
+                await self.line_repository.create(line)
+
+                existing_lines[line.id] = line
+                created_ids.add(line.id)
+                progress = True
+
+            if not progress:
+                raise InvalidLineRelationshipError
+
+            pending = next_pending
 
     async def get_tree(
             self,
@@ -309,6 +482,7 @@ class LineService:
                 tag=data.tag,
                 moves=data.moves,
                 analytic_version=1,
+                parent_analytic_version=None,
             )
 
             await self.line_repository.create(line)
@@ -392,27 +566,12 @@ class LineService:
 
             repertoire.revision += 1
 
-    async def replace_tree(
+    async def patch_lines(
             self,
             repertoire_id: uuid.UUID,
             user_id: uuid.UUID,
-            data: LineTreeReplaceRequest,
-            ) -> None:
-        repertoire = await self.repertoire_repository.get_by_id_for_user(
-            repertoire_id,
-            user_id,
-        )
-
-        if repertoire is None:
-            raise RepertoireNotFoundError
-
-        self._validate_tree(
-            data.tree,
-            chess.Board(),
-            repertoire.side,
-            True,
-        )
-
+            data: LinePatchRequest,
+            ) -> int:
         async with self.session.begin():
             repertoire = await self.repertoire_repository.get_by_id_for_user_for_update(
                 repertoire_id,
@@ -425,69 +584,95 @@ class LineService:
             if repertoire.revision != data.revision:
                 raise RepertoireRevisionConflictError
 
-            root = await self.line_repository.get_root(
-                repertoire_id,
+            existing_lines_list = (
+                await self.line_repository.get_all_by_repertoire(
+                    repertoire_id,
+                )
+            )
+            existing_lines = {
+                line.id: line
+                for line in existing_lines_list
+            }
+            existing_ids = set(existing_lines)
+
+            self._validate_batch_ids(
+                data,
+                existing_ids,
             )
 
-            if root is None:
-                root = Line(
-                    repertoire_id=repertoire_id,
-                    parent_id=None,
-                    tag=data.tree.tag,
-                    moves=data.tree.moves,
-                    analytic_version=1,
+            delete_ids = set(data.delete)
+
+            self._validate_delete_tree(
+                existing_lines,
+                delete_ids,
+            )
+
+            self._validate_create_relationships(
+                data.create,
+                existing_lines,
+                delete_ids,
+            )
+
+            self._validate_create_update_conflicts(data)
+
+            update_lines = {
+                item.line_id: existing_lines[item.line_id]
+                for item in data.update
+            }
+
+            for line in update_lines.values():
+                if line.parent_id is None and line.id in delete_ids:
+                    raise RootLineDeletionError
+
+                has_children = await self.line_repository.has_children(
+                    line.id,
                 )
 
-                await self.line_repository.create(root)
+                if (
+                    has_children
+                    and any(
+                        item.line_id == line.id
+                        and item.moves is not None
+                        for item in data.update
+                    )
+                ):
+                    raise ParentLineMovesUpdateError
 
-                await self._create_children_recursive(
-                    repertoire_id,
-                    root.id,
-                    data.tree.children,
+            for item in data.update:
+                line = update_lines[item.line_id]
+                fields = item.model_dump(
+                    exclude_unset=True,
                 )
 
-            else:
-                existing_lines = await self.line_repository.get_all_by_repertoire(
-                    repertoire_id,
-                )
+                if 'tag' in fields:
+                    line.tag = fields['tag']
 
-                for line in existing_lines:
-                    if line.id != root.id:
-                        await self.session.delete(line)
+                if 'moves' in fields:
+                    await self._validate_line_moves(
+                        repertoire.side,
+                        repertoire_id,
+                        line,
+                        fields['moves'],
+                    )
 
-                root.tag = data.tree.tag
-                root.moves = data.tree.moves
+                    line.moves = fields['moves']
+                    line.analytic_version += 1
 
-                await self.session.flush()
+            await self._create_batch_lines(
+                repertoire_id,
+                repertoire.side,
+                data.create,
+                existing_lines,
+            )
 
-                await self._create_children_recursive(
-                    repertoire_id,
-                    root.id,
-                    data.tree.children,
-                )
+            for line_id in data.delete:
+                line = existing_lines[line_id]
+
+                if line.parent_id is None:
+                    raise RootLineDeletionError
+
+                await self.line_repository.delete(line)
 
             repertoire.revision += 1
-            repertoire.analytic_version += 1
 
-    async def _create_children_recursive(
-            self,
-            repertoire_id: uuid.UUID,
-            parent_id: uuid.UUID,
-            children: list[LineTreeReplace],
-            ) -> None:
-        for child_data in children:
-            child = Line(
-                repertoire_id=repertoire_id,
-                parent_id=parent_id,
-                tag=child_data.tag,
-                moves=child_data.moves,
-                analytic_version=1,
-            )
-
-            await self.line_repository.create(child)
-
-            await self._create_children_recursive(
-                repertoire_id,
-                child.id,
-                child_data.children,
-            )
+        return repertoire.revision
