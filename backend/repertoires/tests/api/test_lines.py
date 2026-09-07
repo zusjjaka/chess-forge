@@ -9,8 +9,8 @@ from api.dependencies import (
     get_line_service,
 )
 from main import app
+from models.line import Line
 from models.repertoire import (
-    Line,
     Repertoire,
     RepertoireSide,
 )
@@ -31,7 +31,7 @@ def repertoire(
         name='Italian Game',
         description='',
         side=RepertoireSide.WHITE,
-        version=1,
+        revision=1,
     )
 
 
@@ -45,6 +45,8 @@ def root(
         parent_id=None,
         tag=None,
         moves=['e2e4'],
+        analytic_version=1,
+        parent_analytic_version=None,
     )
 
 
@@ -60,6 +62,7 @@ async def test_get_lines(
         'id': root.id,
         'tag': None,
         'moves': ['e2e4'],
+        'analytic_version': 1,
         'children': [],
     }
 
@@ -86,6 +89,7 @@ async def test_get_lines(
 
         assert body['id'] == str(root.id)
         assert body['moves'] == ['e2e4']
+        assert body['analytic_version'] == 1
         assert body['children'] == []
 
         service.get_tree_response.assert_awaited_once_with(
@@ -108,6 +112,7 @@ async def test_get_line(
         'id': root.id,
         'tag': 'Root',
         'moves': ['e2e4'],
+        'analytic_version': 3,
         'children': [],
     }
 
@@ -134,6 +139,7 @@ async def test_get_line(
 
         assert body['id'] == str(root.id)
         assert body['tag'] == 'Root'
+        assert body['analytic_version'] == 3
 
         service.get_line_response.assert_awaited_once_with(
             repertoire.id,
@@ -158,6 +164,8 @@ async def test_create_line(
         parent_id=root.id,
         tag='Main line',
         moves=['e7e5', 'g1f3'],
+        analytic_version=1,
+        parent_analytic_version=None,
     )
 
     service.create_child.return_value = child
@@ -190,6 +198,7 @@ async def test_create_line(
         assert body['id'] == str(child.id)
         assert body['tag'] == 'Main line'
         assert body['moves'] == ['e7e5', 'g1f3']
+        assert body['analytic_version'] == 1
 
         service.create_child.assert_awaited_once()
 
@@ -312,11 +321,17 @@ async def test_delete_line(
 
 
 @pytest.mark.asyncio
-async def test_replace_tree(
+async def test_patch_lines(
         user_id: uuid.UUID,
         repertoire: Repertoire,
+        root: Line,
         ) -> None:
     service = AsyncMock()
+    service.patch_lines.return_value = 5
+
+    child_id = uuid.uuid4()
+    updated_line_id = uuid.uuid4()
+    deleted_line_id = uuid.uuid4()
 
     app.dependency_overrides[
         get_current_user_id
@@ -331,27 +346,128 @@ async def test_replace_tree(
             transport=ASGITransport(app=app),
             base_url='http://test',
         ) as client:
-            response = await client.put(
+            response = await client.patch(
                 f'/api/v1/repertoires/{repertoire.id}/lines',
                 json={
-                    'version': 1,
-                    'tree': {
-                        'tag': 'Root',
-                        'moves': ['e2e4'],
-                        'children': [],
-                    },
+                    'revision': 4,
+                    'create': [
+                        {
+                            'line_id': str(child_id),
+                            'parent_id': str(root.id),
+                            'tag': 'Main line',
+                            'moves': [
+                                'e7e5',
+                                'g1f3',
+                            ],
+                        },
+                    ],
+                    'update': [
+                        {
+                            'line_id': str(updated_line_id),
+                            'tag': 'Updated',
+                            'moves': [
+                                'e7e5',
+                                'g1f3',
+                            ],
+                        },
+                    ],
+                    'delete': [
+                        str(deleted_line_id),
+                    ],
                 },
             )
 
-        assert response.status_code == 204
+        assert response.status_code == 200
+        assert response.json() == {
+            'revision': 5,
+        }
 
-        service.replace_tree.assert_awaited_once()
+        service.patch_lines.assert_awaited_once()
 
-        args = service.replace_tree.await_args.args
+        args = service.patch_lines.await_args.args
 
         assert args[0] == repertoire.id
         assert args[1] == user_id
-        assert args[2].version == 1
-        assert args[2].tree.moves == ['e2e4']
+        assert args[2].revision == 4
+
+        assert len(args[2].create) == 1
+        assert args[2].create[0].line_id == child_id
+        assert args[2].create[0].parent_id == root.id
+        assert args[2].create[0].tag == 'Main line'
+        assert args[2].create[0].moves == [
+            'e7e5',
+            'g1f3',
+        ]
+
+        assert len(args[2].update) == 1
+        assert args[2].update[0].line_id == updated_line_id
+        assert args[2].update[0].tag == 'Updated'
+        assert args[2].update[0].moves == [
+            'e7e5',
+            'g1f3',
+        ]
+
+        assert args[2].delete == [deleted_line_id]
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_patch_lines_rejects_empty_operations(
+        user_id: uuid.UUID,
+        repertoire: Repertoire,
+        ) -> None:
+    app.dependency_overrides[
+        get_current_user_id
+    ] = lambda: user_id
+
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url='http://test',
+        ) as client:
+            response = await client.patch(
+                f'/api/v1/repertoires/{repertoire.id}/lines',
+                json={
+                    'revision': 1,
+                    'create': [],
+                    'update': [],
+                    'delete': [],
+                },
+            )
+
+        assert response.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_patch_lines_rejects_invalid_revision(
+        user_id: uuid.UUID,
+        repertoire: Repertoire,
+        ) -> None:
+    app.dependency_overrides[
+        get_current_user_id
+    ] = lambda: user_id
+
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url='http://test',
+        ) as client:
+            response = await client.patch(
+                f'/api/v1/repertoires/{repertoire.id}/lines',
+                json={
+                    'revision': 0,
+                    'update': [
+                        {
+                            'line_id': str(uuid.uuid4()),
+                            'tag': 'Updated',
+                        },
+                    ],
+                },
+            )
+
+        assert response.status_code == 422
     finally:
         app.dependency_overrides.clear()

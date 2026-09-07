@@ -2,14 +2,14 @@ import uuid
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from models.line import Line
 from models.repertoire import (
-    Line,
     Repertoire,
     RepertoireSide,
 )
-from repositories.line import LineRepository
 from repositories.repertoire import RepertoireRepository
 
 
@@ -42,6 +42,7 @@ async def test_repertoire_creation_is_committed(
 
     assert saved is not None
     assert saved.id == repertoire_id
+    assert saved.revision == 1
 
 
 @pytest.mark.asyncio
@@ -93,6 +94,8 @@ async def test_line_creation_is_rolled_back_with_parent_transaction(
         repertoire_id=repertoire_id,
         parent_id=None,
         moves=['e2e4'],
+        analytic_version=1,
+        parent_analytic_version=None,
     )
 
     session.add(line)
@@ -117,7 +120,7 @@ async def test_line_creation_is_rolled_back_with_parent_transaction(
 
 
 @pytest.mark.asyncio
-async def test_version_increment_is_persisted(
+async def test_revision_increment_is_persisted(
         session: AsyncSession,
         ) -> None:
     repository = RepertoireRepository(session)
@@ -132,17 +135,17 @@ async def test_version_increment_is_persisted(
     await repository.create(repertoire)
     await session.commit()
 
-    repertoire.version += 1
+    repertoire.revision += 1
 
     await session.commit()
 
     await session.refresh(repertoire)
 
-    assert repertoire.version == 2
+    assert repertoire.revision == 2
 
 
 @pytest.mark.asyncio
-async def test_stale_version_update_does_not_modify_version(
+async def test_line_analytic_version_increment_is_persisted(
         session: AsyncSession,
         ) -> None:
     repository = RepertoireRepository(session)
@@ -155,35 +158,30 @@ async def test_stale_version_update_does_not_modify_version(
     )
 
     await repository.create(repertoire)
-    await session.commit()
 
-    result = await repository.update_version(
-        repertoire.id,
-        expected_version=1,
+    line = Line(
+        repertoire_id=repertoire.id,
+        parent_id=None,
+        moves=['e2e4'],
+        analytic_version=1,
+        parent_analytic_version=None,
     )
 
-    assert result is True
+    session.add(line)
+    await session.commit()
+
+    line.analytic_version += 1
 
     await session.commit()
-    await session.refresh(repertoire)
 
-    assert repertoire.version == 2
+    await session.refresh(line)
 
-    stale_result = await repository.update_version(
-        repertoire.id,
-        expected_version=1,
-    )
-
-    assert stale_result is False
-
-    await session.commit()
-    await session.refresh(repertoire)
-
-    assert repertoire.version == 2
+    assert line.analytic_version == 2
+    assert line.parent_analytic_version is None
 
 
 @pytest.mark.asyncio
-async def test_two_sequential_version_updates_require_current_version(
+async def test_line_analytic_versions_can_be_persisted_together(
         session: AsyncSession,
         ) -> None:
     repository = RepertoireRepository(session)
@@ -196,26 +194,59 @@ async def test_two_sequential_version_updates_require_current_version(
     )
 
     await repository.create(repertoire)
-    await session.commit()
 
-    first_update = await repository.update_version(
-        repertoire.id,
-        expected_version=1,
+    line = Line(
+        repertoire_id=repertoire.id,
+        parent_id=None,
+        moves=['e2e4'],
+        analytic_version=3,
+        parent_analytic_version=2,
     )
 
+    session.add(line)
     await session.commit()
 
-    second_update = await repository.update_version(
-        repertoire.id,
-        expected_version=2,
+    await session.refresh(line)
+
+    assert line.analytic_version == 3
+    assert line.parent_analytic_version == 2
+
+
+@pytest.mark.asyncio
+async def test_line_analytic_versions_are_rolled_back_together(
+        session: AsyncSession,
+        ) -> None:
+    repository = RepertoireRepository(session)
+
+    repertoire = Repertoire(
+        user_id=uuid.uuid4(),
+        name='Test',
+        description='',
+        side=RepertoireSide.WHITE,
     )
 
-    await session.commit()
-    await session.refresh(repertoire)
+    await repository.create(repertoire)
 
-    assert first_update is True
-    assert second_update is True
-    assert repertoire.version == 3
+    line = Line(
+        repertoire_id=repertoire.id,
+        parent_id=None,
+        moves=['e2e4'],
+        analytic_version=1,
+        parent_analytic_version=None,
+    )
+
+    session.add(line)
+    await session.commit()
+
+    line.analytic_version = 2
+    line.parent_analytic_version = 1
+
+    await session.rollback()
+
+    await session.refresh(line)
+
+    assert line.analytic_version == 1
+    assert line.parent_analytic_version is None
 
 
 @pytest.mark.asyncio
@@ -252,7 +283,7 @@ async def test_transaction_rolls_back_on_integrity_error(
 
     session.add(second_root)
 
-    with pytest.raises(Exception):
+    with pytest.raises(IntegrityError):
         await session.flush()
 
     await session.rollback()

@@ -43,9 +43,8 @@
 │
 ├── <a href="#get-apiv1repertoires">repertoires/</a>
 │   └── <a href="#get-apiv1repertoiresrepertoire_id">{repertoire_id}</a>
-│       ├── <a href="#get-apiv1repertoiresrepertoire_idlines">lines/</a>
-│       │   └── <a href="#get-apiv1repertoiresrepertoire_idlinesline_id">{line_id}</a>
-│       └── ...
+│       └── <a href="#get-apiv1repertoiresrepertoire_idlines">lines/</a>
+│           └── <a href="#get-apiv1repertoiresrepertoire_idlinesline_id">{line_id}</a>
 │
 └── training/
     ├── <a href="#get-apiv1trainingsessions">sessions/</a>
@@ -76,7 +75,7 @@
   "password": "string",
   "password_repeat": "string"
 }
-````
+```
 
 **Output — `201 Created`**
 
@@ -360,7 +359,16 @@ Ownership определяется по JWT. `user_id` не передаётся
 
 `side` задаётся при создании репертуара и после этого не изменяется.
 
-Изменения структуры линий увеличивают `version` репертуара. Изменения метаданных репертуара `version` не увеличивают.
+Репертуар содержит две независимые версии:
+
+* `revision` — техническая ревизия состояния дерева, используемая для optimistic locking;
+* `analytic_version` — версия полного состояния дерева, используемая для привязки аналитики.
+
+`revision` изменяется при изменении дерева.
+
+`analytic_version` изменяется только при полной замене дерева через `PUT /api/v1/repertoires/{repertoire_id}/lines`.
+
+Изменения только метаданных репертуара не изменяют ни `revision`, ни `analytic_version`.
 
 ---
 
@@ -391,7 +399,8 @@ Ownership определяется по JWT. `user_id` не передаётся
       "name": "White repertoire",
       "description": "My main white repertoire",
       "side": "white",
-      "version": 1,
+      "revision": 4,
+      "analytic_version": 2,
       "created_at": "2026-01-01T12:00:00Z",
       "updated_at": "2026-01-01T12:03:33Z"
     }
@@ -405,11 +414,11 @@ Ownership определяется по JWT. `user_id` не передаётся
 
 ### `POST /api/v1/repertoires`
 
-Создаёт новый репертуар.
+Создаёт новый пустой репертуар.
 
-При создании автоматически создаётся единственная root line репертуара.
+Root line при создании репертуара не создаётся автоматически.
 
-Root line нельзя создать отдельно через API.
+Пустой репертуар может быть инициализирован позже через `PUT /api/v1/repertoires/{repertoire_id}/lines`.
 
 **Input**
 
@@ -417,10 +426,7 @@ Root line нельзя создать отдельно через API.
 {
   "name": "White repertoire",
   "description": "My main white repertoire",
-  "side": "white",
-  "root_moves": [
-    "e2e4"
-  ]
+  "side": "white"
 }
 ```
 
@@ -428,14 +434,14 @@ Root line нельзя создать отдельно через API.
 
 * `name` — от 1 до 40 символов;
 * `description` — строка;
-* `side` — `white` или `black`;
-* `root_moves` — непустой список UCI ходов;
-* каждый move должен соответствовать синтаксису UCI;
-* каждый move должен быть легальным относительно текущей шахматной позиции;
-* для `white` длина `root_moves` должна быть нечётной;
-* для `black` длина `root_moves` должна быть чётной.
+* `side` — `white` или `black`.
 
-Root line создаётся внутри той же транзакции, что и repertoire.
+Новый репертуар создаётся со следующими начальными значениями:
+
+```text
+revision = 1
+analytic_version = 1
+```
 
 **Output — `201 Created`**
 
@@ -446,7 +452,8 @@ Root line создаётся внутри той же транзакции, чт
   "name": "White repertoire",
   "description": "My main white repertoire",
   "side": "white",
-  "version": 1,
+  "revision": 1,
+  "analytic_version": 1,
   "created_at": "2026-01-01T12:00:00Z",
   "updated_at": "2026-01-01T12:00:00Z"
 }
@@ -475,11 +482,14 @@ repertoire_id: UUID
   "name": "White repertoire",
   "description": "My main white repertoire",
   "side": "white",
-  "version": 2,
+  "revision": 2,
+  "analytic_version": 1,
   "created_at": "2026-01-01T12:00:00Z",
   "updated_at": "2026-01-01T12:03:33Z"
 }
 ```
+
+GET не изменяет ни `revision`, ни `analytic_version`.
 
 Если репертуар не существует или принадлежит другому пользователю, возвращается `404 Not Found`.
 
@@ -490,6 +500,8 @@ repertoire_id: UUID
 Обновляет метаданные репертуара.
 
 `side` изменить через этот endpoint нельзя.
+
+Изменение `name` и `description` не изменяет ни `revision`, ни `analytic_version`.
 
 **Input**
 
@@ -541,8 +553,6 @@ repertoire_id: UUID
 * `name` — от 1 до 40 символов;
 * `description` — строка или `null`.
 
-`version` при изменении метаданных не увеличивается.
-
 **Output — `200 OK`**
 
 ```json
@@ -552,7 +562,8 @@ repertoire_id: UUID
   "name": "Updated name",
   "description": "Updated description",
   "side": "white",
-  "version": 1,
+  "revision": 1,
+  "analytic_version": 1,
   "created_at": "2026-01-01T12:00:00Z",
   "updated_at": "2026-01-01T12:03:33Z"
 }
@@ -563,6 +574,8 @@ repertoire_id: UUID
 ### `DELETE /api/v1/repertoires/{repertoire_id}`
 
 Удаляет репертуар вместе со всеми его линиями.
+
+Операция не изменяет версии: после удаления репертуар больше не существует.
 
 **Input**
 
@@ -582,14 +595,21 @@ repertoire_id: UUID
 
 Линии образуют дерево внутри репертуара.
 
-Каждый репертуар имеет ровно один root line.
+Пустой репертуар не имеет root line.
+
+Первая root line создаётся через:
+
+```text
+PUT /api/v1/repertoires/{repertoire_id}/lines
+```
+
+После инициализации репертуар содержит ровно одну root line.
 
 Root line:
 
-* создаётся автоматически вместе с repertoire;
 * не имеет `parent_id`;
 * имеет непустой `moves`;
-* не может быть создан отдельно;
+* не может быть создан отдельно через `POST`;
 * не может быть удалён;
 * сохраняет свой `id` при замене дерева через `PUT /lines`.
 
@@ -599,31 +619,21 @@ Root line:
 
 Leaf определяется отсутствием дочерних линий.
 
-Пример:
+Каждая линия имеет собственную `analytic_version`.
 
-```text
-root [e2e4]
-├── main-line [e7e5, g1f3]
-│   ├── giuoco-piano [b8c6, f1c4]
-│   └── two-knights [g8f6, f3g5]
-│
-└── scotch [e7e5, d2d4]
-    └── variation [e5d4, g1f3]
-```
+Она относится только к версии `moves` конкретной линии:
 
-Для каждой линии:
-
-* `moves` не может быть пустым;
-* каждый move должен соответствовать синтаксису UCI;
-* каждый move должен быть легальным относительно полной позиции ancestry;
-* для `white` длина `moves` должна быть нечётной;
-* для `black` длина `moves` должна быть чётной.
+* создание линии → `analytic_version = 1`;
+* изменение только `tag` → версия не изменяется;
+* изменение `moves` → `analytic_version += 1`.
 
 ---
 
 ### `GET /api/v1/repertoires/{repertoire_id}/lines`
 
 Возвращает дерево репертуара, начиная с root line.
+
+Если репертуар ещё не инициализирован и root line отсутствует, возвращается `404 Not Found`.
 
 **Input**
 
@@ -644,6 +654,7 @@ Query parameters отсутствуют.
   "moves": [
     "e2e4"
   ],
+  "analytic_version": 1,
   "children": [
     {
       "id": "uuid",
@@ -652,6 +663,7 @@ Query parameters отсутствуют.
         "e7e5",
         "g1f3"
       ],
+      "analytic_version": 1,
       "children": [
         {
           "id": "uuid",
@@ -660,6 +672,7 @@ Query parameters отсутствуют.
             "b8c6",
             "f1c4"
           ],
+          "analytic_version": 1,
           "children": []
         }
       ]
@@ -670,89 +683,70 @@ Query parameters отсутствуют.
 
 ---
 
-### `PUT /api/v1/repertoires/{repertoire_id}/lines`
+### `PATCH /api/v1/repertoires/{repertoire_id}/lines`
 
-Полностью заменяет содержимое дерева репертуара.
+Атомарно изменяет дерево репертуара.
 
-Root line сохраняет свой существующий `id`. Его `tag` и `moves`, а также все дочерние линии заменяются содержимым запроса.
+Позволяет одновременно создавать, изменять и удалять линии в рамках одной операции.
 
-Операция выполняется атомарно.
-
-Для защиты от перезаписи изменений другого клиента используется optimistic locking через `version`.
+Для защиты от перезаписи изменений другого клиента используется optimistic locking через `revision`.
 
 **Input**
 
 ```json
 {
-  "version": 1,
-  "tree": {
-    "tag": null,
-    "moves": [
-      "e2e4"
-    ],
-    "children": [
-      {
-        "tag": "main-line",
-        "moves": [
-          "e7e5",
-          "g1f3"
-        ],
-        "children": [
-          {
-            "tag": "giuoco-piano",
-            "moves": [
-              "b8c6",
-              "f1c4"
-            ],
-            "children": []
-          }
-        ]
-      }
-    ]
-  }
+  "revision": 4,
+  "create": [
+    {
+      "line_id": "uuid",
+      "parent_id": "uuid",
+      "tag": "sicilian-dragon",
+      "moves": [
+        "e7e5",
+        "g1f3"
+      ]
+    }
+  ],
+  "update": [
+    {
+      "line_id": "uuid",
+      "tag": "main-line",
+      "moves": [
+        "b8c6",
+        "f1c4"
+      ]
+    }
+  ],
+  "delete": [
+    "uuid"
+  ]
 }
 ```
 
-Ограничения:
+* `revision` — целое число не меньше `1`;
+* `create` — список новых линий;
+* `update` — список изменяемых линий;
+* `delete` — список удаляемых линий.
 
-* `version` — целое число не меньше `1`;
-* `tree` представляет root line;
-* `tree.moves` — непустой список;
-* `children` может быть пустым;
-* каждая линия дерева должна иметь непустой `moves`;
-* каждый move должен соответствовать синтаксису UCI;
-* каждый move должен быть легальным относительно полной позиции ancestry;
-* для `white` длина `moves` каждой линии должна быть нечётной;
-* для `black` длина `moves` каждой линии должна быть чётной.
+Каждая создаваемая или изменяемая линия должна иметь непустой `moves`.
 
-Перед изменением базы данных всё входное дерево полностью валидируется.
+`moves` должны содержать легальные UCI-ходы относительно полной позиции ancestry.
 
-После валидации сервер повторно проверяет актуальную `version` репертуара внутри транзакции.
+Для `update` изменение `moves` линии с дочерними линиями запрещено.
 
-Если переданная версия отличается от актуальной версии репертуара, дерево не изменяется.
+Удаление линии удаляет её поддерево.
 
-**Output — `204 No Content`**
+Root line не может быть удалена.
 
-После успешной операции `repertoire.version` увеличивается ровно на `1`.
+**Output — `204 Ok`**
 
-**Output — `409 Conflict`**
-
-Возвращается, если переданная версия устарела.
-
-```text
-Repertoire version conflict
+```json
+{
+  "revision": 5
+}
 ```
 
-Например:
-
-```text
-Client version: 5
-Current version: 6
-        ↓
-409 Conflict
-```
-
-В этом случае никакие изменения дерева не применяются.
+Если переданный `revision` устарел, возвращается `409 Conflict`.
 
 ---
 
@@ -779,6 +773,7 @@ line_id: UUID
     "e7e5",
     "g1f3"
   ],
+  "analytic_version": 2,
   "children": [
     {
       "id": "uuid",
@@ -787,11 +782,14 @@ line_id: UUID
         "b8c6",
         "f1c4"
       ],
+      "analytic_version": 1,
       "children": []
     }
   ]
 }
 ```
+
+GET не изменяет версии.
 
 Если линия не существует или не принадлежит указанному репертуару, возвращается `404 Not Found`.
 
@@ -827,8 +825,7 @@ line_id: UUID
 * `moves` — непустой список;
 * каждый move должен соответствовать синтаксису UCI;
 * каждый move должен быть легальным относительно позиции после ancestry родительской линии;
-* для `white` длина `moves` должна быть нечётной;
-* для `black` длина `moves` должна быть чётной;
+* для non-root линии длина `moves` должна быть чётной;
 * `tag` может быть `null`.
 
 **Output — `201 Created`**
@@ -841,11 +838,20 @@ line_id: UUID
     "e7e5",
     "g1f3"
   ],
+  "analytic_version": 1,
   "children": []
 }
 ```
 
-После успешной операции `repertoire.version` увеличивается на `1`.
+После успешной операции:
+
+```text
+repertoire.revision += 1
+```
+
+`repertoire.analytic_version` не изменяется.
+
+Существующие линии не получают новых аналитических версий.
 
 ---
 
@@ -866,14 +872,6 @@ line_id: UUID
   ]
 }
 ```
-
-Пустой PATCH допустим:
-
-```json
-{}
-```
-
-и не изменяет линию.
 
 `tag: null` очищает tag:
 
@@ -910,7 +908,7 @@ line_a [e4, e5]
 
 для `line_a` недопустим.
 
-При этом `tag` родительской линии менять можно:
+При этом `tag` родительской линии изменять можно:
 
 ```json
 {
@@ -926,6 +924,26 @@ line_a [e4, e5]
 * легальным относительно полной позиции ancestry;
 * согласованным с parity-правилом repertoire.
 
+**Влияние на версии**
+
+Изменение только `tag`:
+
+```text
+repertoire.revision += 1
+line.analytic_version не изменяется
+repertoire.analytic_version не изменяется
+```
+
+Изменение `moves`:
+
+```text
+repertoire.revision += 1
+line.analytic_version += 1
+repertoire.analytic_version не изменяется
+```
+
+Если переданы одновременно `tag` и `moves`, `revision` и `line.analytic_version` увеличиваются только один раз.
+
 **Output — `200 OK`**
 
 ```json
@@ -936,11 +954,10 @@ line_a [e4, e5]
     "e7e5",
     "g1f3"
   ],
+  "analytic_version": 3,
   "children": []
 }
 ```
-
-После изменения линии `repertoire.version` увеличивается на `1`.
 
 ---
 
@@ -963,7 +980,17 @@ line_id: UUID
 
 **Output — `204 No Content`**
 
-После успешной операции `repertoire.version` увеличивается на `1`.
+После успешной операции:
+
+```text
+repertoire.revision += 1
+```
+
+`repertoire.analytic_version` не изменяется.
+
+`Line.analytic_version` существующих линий также не изменяется.
+
+Аналитика удалённых линий больше не относится к существующему дереву, поскольку соответствующие `line_id` удаляются.
 
 Попытка удалить root line возвращает:
 
@@ -976,6 +1003,27 @@ line_id: UUID
 ```text
 404 Not Found
 ```
+
+---
+
+# Analytics Versioning
+
+Аналитика привязывается к двум независимым значениям:
+
+```text
+repertoire.analytic_version
+line.analytic_version
+```
+
+Для текущего анализа линии необходимо, чтобы оба значения соответствовали значениям, с которыми был построен анализ.
+
+`repertoire.revision` для проверки валидности аналитики не используется.
+
+`repertoire.revision` предназначен исключительно для optimistic locking и предотвращения конкурентной перезаписи дерева.
+
+При изменении `moves` конкретной линии её `Line.analytic_version` увеличивается, поэтому аналитика этой линии становится устаревшей, не затрагивая аналитики других линий.
+
+При полном `PUT /lines` увеличивается `Repertoire.analytic_version`, поэтому аналитика предыдущего поколения полного дерева больше не соответствует текущему поколению.
 
 ---
 
@@ -1068,7 +1116,7 @@ session_id: UUID
   "id": "uuid",
   "status": "invalidated",
   "line_id": "uuid",
-  "repertoire_version": 7,
+  "repertoire_revision": 7,
   "current_ply": 6
 }
 ```
@@ -1078,7 +1126,7 @@ session_id: UUID
 Если:
 
 ```text
-repertoire.version != training_session.repertoire_version
+repertoire.revision != training_session.repertoire_revision
 ```
 
 сессия получает статус `invalidated`.
@@ -1116,26 +1164,6 @@ session_id: UUID
 Тренировочный сервис проверяет валидность хода и обновляет состояние сессии.
 
 При неправильном ответе сессия становится `failed`.
-
----
-
-### `POST /api/v1/training/sessions/{session_id}/finish`
-
-Завершает тренировку.
-
-**Input**
-
-Нет.
-
-**Output — `200 OK`**
-
-```json
-{
-  "id": "uuid",
-  "status": "completed",
-  "ended_at": "2026-01-01T12:10:00Z"
-}
-```
 
 ---
 
@@ -1226,6 +1254,8 @@ Access токен отсутствует, недействителен или и
 
 Для repertoire/line ресурсов это также используется, когда ресурс существует, но принадлежит другому пользователю.
 
+Если репертуар не инициализирован и root line отсутствует, `GET /repertoires/{repertoire_id}/lines` также возвращает `404 Not Found`.
+
 ### `405 Method Not Allowed`
 
 HTTP-метод не существует для данного endpoint.
@@ -1234,7 +1264,7 @@ HTTP-метод не существует для данного endpoint.
 
 Запрашиваемая операция конфликтует с текущим состоянием ресурса.
 
-Для `PUT /api/v1/repertoires/{repertoire_id}/lines` используется при конфликте версии репертуара.
+Для `PUT /api/v1/repertoires/{repertoire_id}/lines` используется при конфликте `revision` репертуара.
 
 ### `415 Unsupported Media Type`
 
@@ -1251,7 +1281,7 @@ HTTP-метод не существует для данного endpoint.
 * пустой `moves`;
 * превышена максимальная длина `tag`;
 * некорректное значение `side`;
-* `version < 1`.
+* `revision < 1`.
 
 ### `429 Too Many Requests`
 

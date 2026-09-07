@@ -6,17 +6,14 @@ from httpx import ASGITransport, AsyncClient
 
 from api.dependencies import (
     get_current_user_id,
-    get_line_service,
     get_repertoire_service,
 )
 from exceptions import (
-    DatabaseCheckConstraintError,
     DatabaseConnectionError,
     DatabaseError,
-    InvalidLineRelationshipError,
     LineNotFoundError,
     RepertoireNotFoundError,
-    RootLineAlreadyExistsError,
+    RepertoireRevisionConflictError,
     RootLineDeletionError,
 )
 from main import app
@@ -44,6 +41,11 @@ from main import app
             RootLineDeletionError(),
             400,
             'Root line cannot be deleted',
+        ),
+        (
+            RepertoireRevisionConflictError(),
+            409,
+            'Repertoire revision conflict',
         ),
     ],
 )

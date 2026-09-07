@@ -7,7 +7,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.repertoire import Line
+from models.line import Line
 
 
 class LineRepository:
@@ -22,7 +22,7 @@ class LineRepository:
 
     async def get_by_id(
             self,
-            line_id: uuid.UUID
+            line_id: uuid.UUID,
             ) -> Line | None:
         result = await self.session.execute(
             select(Line).where(

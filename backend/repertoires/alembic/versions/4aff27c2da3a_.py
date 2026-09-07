@@ -1,8 +1,8 @@
-"""create repertoires tables
+"""empty message
 
-Revision ID: 8a5ea231e596
+Revision ID: 4aff27c2da3a
 Revises: 
-Create Date: 2026-09-04 12:59:05.290558
+Create Date: 2026-09-06 20:47:28.786873
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '8a5ea231e596'
+revision: str = '4aff27c2da3a'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -27,7 +27,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=40), nullable=False),
     sa.Column('description', sa.Text(), nullable=False),
     sa.Column('side', sa.Enum('white', 'black', name='repertoire_side'), nullable=False),
-    sa.Column('version', sa.Integer(), nullable=False),
+    sa.Column('revision', sa.Integer(), nullable=False),
+    sa.Column('analytic_version', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id')
@@ -39,11 +40,14 @@ def upgrade() -> None:
     sa.Column('parent_id', sa.UUID(), nullable=True),
     sa.Column('tag', sa.String(length=100), nullable=True),
     sa.Column('moves', postgresql.ARRAY(sa.String()), nullable=False),
+    sa.Column('analytic_version', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['parent_id'], ['lines.id'], ondelete='CASCADE'),
+    sa.CheckConstraint('cardinality(moves) > 0', name='ck_lines_moves_not_empty'),
+    sa.ForeignKeyConstraint(['repertoire_id', 'parent_id'], ['lines.repertoire_id', 'lines.id'], name='fk_lines_repertoire_parent', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['repertoire_id'], ['repertoires.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('repertoire_id', 'id', name='uq_lines_repertoire_id')
     )
     op.create_index(op.f('ix_lines_parent_id'), 'lines', ['parent_id'], unique=False)
     op.create_index(op.f('ix_lines_repertoire_id'), 'lines', ['repertoire_id'], unique=False)

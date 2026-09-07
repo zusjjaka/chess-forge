@@ -34,3 +34,5 @@ logs/
 docker-compose.override.yml
 
 **/keys/private_key.pem
+
+source.txt

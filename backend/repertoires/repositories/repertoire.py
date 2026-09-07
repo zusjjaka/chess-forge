@@ -3,7 +3,6 @@ import uuid
 from sqlalchemy import (
     func,
     select,
-    update,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -89,24 +88,3 @@ class RepertoireRepository:
 
     async def delete(self, repertoire: Repertoire) -> None:
         await self.session.delete(repertoire)
-
-    async def update_version(
-            self,
-            repertoire_id: uuid.UUID,
-            expected_version: int,
-            ) -> bool:
-        result = await self.session.execute(
-            update(Repertoire)
-            .where(
-                Repertoire.id == repertoire_id,
-                Repertoire.version == expected_version,
-            )
-            .values(
-                version=Repertoire.version + 1,
-            )
-            .returning(Repertoire.id)
-        )
-
-        await self.session.flush()
-
-        return result.scalar_one_or_none() is not None

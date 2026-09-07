@@ -9,9 +9,14 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from db.base import Base
+from models.line import Line
+from models.repertoire import Repertoire
 
 
-DATABASE_URL = 'postgresql+asyncpg://repertoires_test:root@localhost:5432/repertoires_test'
+DATABASE_URL = (
+    'postgresql+asyncpg://repertoires_test:root@localhost:5432/'
+    'repertoires_test'
+)
 
 
 @pytest_asyncio.fixture
@@ -34,8 +39,8 @@ async def engine() -> AsyncGenerator[AsyncEngine]:
 
 @pytest_asyncio.fixture
 async def session(
-    engine: AsyncEngine,
-) -> AsyncGenerator[AsyncSession]:
+        engine: AsyncEngine,
+        ) -> AsyncGenerator[AsyncSession]:
     session_factory = async_sessionmaker(
         bind=engine,
         expire_on_commit=False,
