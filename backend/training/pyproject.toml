@@ -1,20 +1,21 @@
 [project]
-name = "email-sender"
-version = "1.0.0"
+name = "training-service"
+version = "0.0.1"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    "aio-pika>=10.0.1",
-    "jinja2>=3.1.6",
-    "pydantic-settings>=2.15.0",
+    "alembic>=1.20.0",
+    "fastapi>=0.141.1",
+    "pydantic>=2.13.5",
+    "sqlalchemy>=2.0.53",
 ]
 
 [dependency-groups]
 dev = [
-    "mypy>=2.3.1",
-    "pre-commit>=4.6.2",
-    "pytest>=9.1.1",
+    "mypy",
+    "pre-commit",
+    "pytest",
     "pytest-asyncio>=1.4.0",
-    "ruff>=0.16.4",
+    "ruff",
 ]
 
 [tool.pytest.ini_options]
@@ -122,5 +123,3 @@ warn_redundant_casts = true
 warn_unused_configs = true
 
 disallow_untyped_decorators = false
-
-ignore_missing_imports = true
