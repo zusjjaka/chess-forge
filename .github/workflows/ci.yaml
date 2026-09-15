@@ -18,6 +18,7 @@ jobs:
       - quality-auth
       - quality-email-sender
       - quality-repertoires
+      - quality-training
     runs-on: ubuntu-latest
 
     steps:
@@ -186,4 +187,56 @@ jobs:
         working-directory: backend/repertoires
         env:
           DATABASE__URL: postgresql+psycopg://repertoires_test:root@localhost:5432/repertoires_test
+        run: uv run pytest
+
+  quality-training:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: training_test
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: training_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U training_test -d training_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        working-directory: backend/training
+        run: uv sync --locked
+
+      - name: Ruff
+        working-directory: backend/training
+        run: uv run ruff check
+
+      - name: Mypy
+        working-directory: backend/training
+        run: uv run mypy .
+
+      - name: Run migrations
+        working-directory: backend/training
+        env:
+          DATABASE__URL: postgresql+psycopg://training_test:root@localhost:5432/training_test
+        run: uv run alembic upgrade head
+
+      - name: Pytest
+        working-directory: backend/training
+        env:
+          DATABASE__URL: postgresql+psycopg://training_test:root@localhost:5432/training_test
         run: uv run pytest

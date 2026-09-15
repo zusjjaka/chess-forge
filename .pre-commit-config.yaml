@@ -66,3 +66,25 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+
+      # Training
+      - id: training-ruff-check-fix
+        name: Training Ruff check --fix
+        entry: uv run --directory backend/training ruff check --fix
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: training-ruff-check
+        name: Training Ruff check
+        entry: uv run --directory backend/training ruff check
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: training-mypy
+        name: Training Mypy
+        entry: uv run --directory backend/training mypy .
+        language: system
+        types: [python]
+        pass_filenames: false
