@@ -245,10 +245,16 @@ jobs:
         working-directory: backend/training
         env:
           DATABASE__URL: postgresql+psycopg://training_test:root@localhost:5432/training_test
+          REPERTOIRE_SERVICE__HOST: localhost
+          REPERTOIRE_SERVICE__PORT: 50051
+          REPERTOIRE_SERVICE__TIMEOUT: 5.0
         run: uv run alembic upgrade head
 
       - name: Pytest
         working-directory: backend/training
         env:
           DATABASE__URL: postgresql+psycopg://training_test:root@localhost:5432/training_test
+          REPERTOIRE_SERVICE__HOST: localhost
+          REPERTOIRE_SERVICE__PORT: 50051
+          REPERTOIRE_SERVICE__TIMEOUT: 5.0
         run: uv run pytest
