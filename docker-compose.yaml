@@ -5,7 +5,7 @@ services:
     env_file:
       - ./backend/auth/.env
     ports:
-      - "8000:8000"
+      - '8000:8000'
     depends_on:
       postgres_auth:
         condition: service_healthy
@@ -14,12 +14,30 @@ services:
     build:
       context: ./backend/repertoires
     environment:
-      DATABASE__URL: postgresql+asyncpg://repertoire:root@repertoires_postgres:5432/repertoires
+      DATABASE__URL: postgresql+asyncpg://repertoire:root@postgres_repertoires:5432/repertoires
     ports:
-      - "8001:8000"
+      - '8001:8000'
+      - '50051:50051'
     depends_on:
       postgres_repertoires:
         condition: service_healthy
+
+  training:
+    build:
+      context: ./backend/training
+    environment:
+      DATABASE__URL: postgresql+asyncpg://training:root@postgres_training:5432/training
+      REPERTOIRE_SERVICE__HOST: repertoires
+      REPERTOIRE_SERVICE__PORT: 50051
+      REPERTOIRE_SERVICE__TIMEOUT: 5.0
+      JWT__PUBLIC_KEY_PATH: keys/public_key.pem
+    ports:
+      - '8002:8000'
+    depends_on:
+      postgres_training:
+        condition: service_healthy
+      repertoires:
+        condition: service_started
 
   postgres_auth:
     image: postgres:18
@@ -28,11 +46,11 @@ services:
       POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
       POSTGRES_DB: ${AUTH_DB_NAME}
     ports:
-      - "5433:5432"
+      - '5433:5432'
     volumes:
       - auth_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER} -d ${AUTH_DB_NAME}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${AUTH_DB_USER} -d ${AUTH_DB_NAME}']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -44,11 +62,35 @@ services:
       POSTGRES_PASSWORD: ${REPERTOIRE_DB_PASSWORD}
       POSTGRES_DB: ${REPERTOIRE_DB_NAME}
     ports:
-      - "5433:5432"
+      - '5434:5432'
     volumes:
       - repertoires_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${REPERTOIRE_DB_USER} -d ${REPERTOIRE_DB_NAME}"]
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${REPERTOIRE_DB_USER} -d ${REPERTOIRE_DB_NAME}',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres_training:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${TRAINING_DB_USER}
+      POSTGRES_PASSWORD: ${TRAINING_DB_PASSWORD}
+      POSTGRES_DB: ${TRAINING_DB_NAME}
+    ports:
+      - '5435:5432'
+    volumes:
+      - training_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${TRAINING_DB_USER} -d ${TRAINING_DB_NAME}',
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -56,7 +98,7 @@ services:
   rabbitmq:
     image: rabbitmq:4.2-management
     ports:
-      - "5672:5672"
+      - '5672:5672'
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
@@ -70,9 +112,9 @@ services:
 
   email_sender:
     build:
-      context: "./backend/email_sender"
+      context: ./backend/email_sender
     env_file:
-      - "./backend/email_sender/.env"
+      - ./backend/email_sender/.env
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -80,4 +122,5 @@ services:
 volumes:
   auth_postgres_data:
   repertoires_postgres_data:
+  training_postgres_data:
   rabbitmq_data:

@@ -47,9 +47,9 @@
 │           └── <a href="#get-apiv1repertoiresrepertoire_idlinesline_id">{line_id}</a>
 │
 └── training/
-    ├── <a href="#get-apiv1trainingsessions">sessions/</a>
-    │   └── <a href="#get-apiv1trainingsessionssession_id">{session_id}</a>
-    └── <a href="#post-apiv1trainingsessionssession_idmoves">sessions/{session_id}/moves</a>
+    └── <a href="#get-apiv1trainingsessions">sessions/</a>
+        └── <a href="#get-apiv1trainingsessionssession_id">{session_id}</a>
+            └── <a href="#post-apiv1trainingsessionssession_idmoves">sessions/{session_id}/moves</a>
 
 
 /ws/v1/

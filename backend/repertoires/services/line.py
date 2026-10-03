@@ -340,7 +340,11 @@ class LineService:
                     tag=data.tag,
                     moves=data.moves,
                     analytic_version=1,
-                    parent_analytic_version=None,
+                    parent_analytic_version=(
+                        parent.analytic_version
+                        if parent is not None
+                        else None
+                    ),
                 )
 
                 await self.line_repository.create(line)
@@ -482,7 +486,11 @@ class LineService:
                 tag=data.tag,
                 moves=data.moves,
                 analytic_version=1,
-                parent_analytic_version=None,
+                parent_analytic_version=(
+                    parent.analytic_version
+                    if parent is not None
+                    else None
+                ),
             )
 
             await self.line_repository.create(line)
