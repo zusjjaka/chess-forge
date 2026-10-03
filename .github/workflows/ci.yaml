@@ -26,7 +26,8 @@ jobs:
         run: |
           if [ "${{ needs.quality-auth.result }}" != "success" ] ||
              [ "${{ needs.quality-email-sender.result }}" != "success" ] ||
-             [ "${{ needs.quality-repertoires.result }}" != "success" ]; then
+             [ "${{ needs.quality-repertoires.result }}" != "success" ] ||
+             [ "${{ needs.quality-training.result }}" != "success" ]; then
             exit 1
           fi
 
@@ -103,6 +104,17 @@ jobs:
 
   quality-email-sender:
     runs-on: ubuntu-latest
+
+    services:
+      rabbitmq:
+        image: rabbitmq:4.2
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout

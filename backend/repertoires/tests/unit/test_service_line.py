@@ -425,7 +425,7 @@ async def test_create_child_increments_revision_only(
     assert result.tag == 'Main line'
     assert result.moves == ['e7e5', 'g1f3']
     assert result.analytic_version == 1
-    assert result.parent_analytic_version is None
+    assert result.parent_analytic_version == root.analytic_version
 
     assert repertoire.revision == 2
 
@@ -440,7 +440,7 @@ async def test_create_child_increments_revision_only(
     assert created_line.tag == 'Main line'
     assert created_line.moves == ['e7e5', 'g1f3']
     assert created_line.analytic_version == 1
-    assert created_line.parent_analytic_version is None
+    assert created_line.parent_analytic_version == root.analytic_version
 
 
 @pytest.mark.asyncio
@@ -894,7 +894,7 @@ async def test_patch_lines_updates_creates_and_deletes_atomically(
     assert created_lines[0].tag == 'Created'
     assert created_lines[0].moves == ['e7e5', 'g1f3']
     assert created_lines[0].analytic_version == 1
-    assert created_lines[0].parent_analytic_version is None
+    assert created_lines[0].parent_analytic_version == root.analytic_version
 
 
 @pytest.mark.asyncio
@@ -985,7 +985,7 @@ async def test_patch_lines_updates_moves_and_increments_only_changed_line_versio
 
 
 @pytest.mark.asyncio
-async def test_patch_lines_create_does_not_change_parent_analytic_version(
+async def test_patch_lines_create_sets_parent_analytic_version(
         service: LineService,
         repertoire: Repertoire,
         root: Line,
@@ -1030,7 +1030,7 @@ async def test_patch_lines_create_does_not_change_parent_analytic_version(
     )
 
     assert created_line.analytic_version == 1
-    assert created_line.parent_analytic_version is None
+    assert created_line.parent_analytic_version == root.analytic_version
 
 
 @pytest.mark.asyncio

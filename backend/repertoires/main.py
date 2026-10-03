@@ -27,13 +27,17 @@ from exceptions import (
     InvalidLineRelationshipError,
     RootLineAlreadyExistsError,
 )
+from rpc.server import create_grpc_server
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
+    grpc_server = await create_grpc_server()
+
     try:
         yield
     finally:
+        await grpc_server.stop(grace=5)
         await engine.dispose()
 
 
@@ -43,7 +47,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(repertoires_router, prefix='/api/v1')
+app.include_router(
+    repertoires_router,
+    prefix='/api/v1',
+)
 
 
 @app.exception_handler(APIException)

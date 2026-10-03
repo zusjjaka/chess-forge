@@ -1,24 +1,21 @@
+from __future__ import annotations
+
+import uuid
 from datetime import datetime
 from enum import StrEnum
-from uuid import (
-    UUID,
-    uuid4,
-)
 
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
     Enum,
-    Integer,
+    Index,
     Text,
     func,
 )
 from sqlalchemy.dialects.postgresql import (
     ARRAY,
     JSONB,
-)
-from sqlalchemy.dialects.postgresql import (
-    UUID as PG_UUID,
+    UUID,
 )
 from sqlalchemy.orm import (
     Mapped,
@@ -38,35 +35,35 @@ class TrainingSessionStatus(StrEnum):
 class TrainingSession(Base):
     __tablename__ = 'training_sessions'
 
-    id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
         primary_key=True,
-        default=uuid4,
+        default=uuid.uuid4,
     )
 
-    user_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
         nullable=False,
+        index=True,
     )
 
-    repertoire_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+    repertoire_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
         nullable=False,
+        index=True,
     )
 
-    start_line_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+    start_line_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
         nullable=False,
     )
 
     current_ply: Mapped[int] = mapped_column(
-        Integer,
         nullable=False,
         default=0,
     )
 
     repertoire_revision: Mapped[int] = mapped_column(
-        Integer,
         nullable=False,
     )
 
@@ -84,24 +81,21 @@ class TrainingSession(Base):
         Enum(
             TrainingSessionStatus,
             name='training_session_status',
-            native_enum=True,
         ),
         nullable=False,
         default=TrainingSessionStatus.ACTIVE,
     )
 
-    error_line_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
+    error_line_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
         nullable=True,
     )
 
     error_line_analytic_version: Mapped[int | None] = mapped_column(
-        Integer,
         nullable=True,
     )
 
     error_ply: Mapped[int | None] = mapped_column(
-        Integer,
         nullable=True,
     )
 
@@ -119,14 +113,19 @@ class TrainingSession(Base):
     __table_args__ = (
         CheckConstraint(
             'current_ply >= 0',
-            name='ck_training_sessions_current_ply_non_negative',
+            name='training_sessions_current_ply_check',
         ),
         CheckConstraint(
             'repertoire_revision >= 0',
-            name='ck_training_sessions_revision_non_negative',
+            name='training_sessions_repertoire_revision_check',
         ),
         CheckConstraint(
             'error_ply >= 0',
-            name='ck_training_sessions_error_ply_non_negative',
+            name='training_sessions_error_ply_check',
+        ),
+        Index(
+            'ix_training_sessions_user_created_at',
+            'user_id',
+            'created_at',
         ),
     )

@@ -1,19 +1,28 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import BaseModel
-from pydantic_settings import (
-    BaseSettings,
-    SettingsConfigDict,
-)
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class DatabaseSettings(BaseModel):
     url: str
 
 
+class RepertoireServiceSettings(BaseModel):
+    host: str
+    port: int
+    timeout: float
+
+
+class JwtSettings(BaseModel):
+    public_key_path: Path = Path('keys/public_key.pem')
+
+
 class Settings(BaseSettings):
-    """Settings for the server."""
     database: DatabaseSettings
+    repertoire_service: RepertoireServiceSettings
+    jwt: JwtSettings = JwtSettings()
 
     model_config = SettingsConfigDict(
         env_file='.env',

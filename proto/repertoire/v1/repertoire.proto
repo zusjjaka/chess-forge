@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package repertoire.v1;
+
+service RepertoireService {
+  rpc GetTrainingTree(GetTrainingTreeRequest) returns (GetTrainingTreeResponse);
+  rpc GetRepertoireRevision(GetRepertoireRevisionRequest) returns (GetRepertoireRevisionResponse);
+}
+
+message GetTrainingTreeRequest {
+  string user_id = 1;
+  string repertoire_id = 2;
+  string start_line_id = 3;
+}
+
+message GetTrainingTreeResponse {
+  int32 repertoire_revision = 1;
+  repeated TrainingLine lines = 2;
+}
+
+message TrainingLine {
+  string id = 1;
+  string parent_id = 2;
+  string tag = 3;
+  repeated string moves = 4;
+  int32 analytic_version = 5;
+}
+
+message GetRepertoireRevisionRequest {
+  string user_id = 1;
+  string repertoire_id = 2;
+}
+
+message GetRepertoireRevisionResponse {
+  int32 repertoire_revision = 1;
+}
